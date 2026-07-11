@@ -64,6 +64,17 @@
   .empty{text-align:center;padding:40px;color:var(--text-light);font-size:.85rem}
   .loading{text-align:center;padding:30px;color:var(--text-light)}
 
+  .margem-box{background:var(--creme);border:1px solid var(--creme-dark);border-radius:9px;padding:14px 16px;margin-bottom:14px}
+  .margem-box h4{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);font-weight:600;margin-bottom:10px}
+  .margem-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+  .margem-item .lbl{font-size:.68rem;color:var(--text-light);margin-bottom:2px}
+  .margem-item .val{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:600;color:var(--bordo-dark);line-height:1.1}
+  .margem-item .val .pct{font-family:'Jost',sans-serif;font-size:.72rem;font-weight:500;color:var(--text-light);margin-left:4px}
+  .margem-item .val.neg{color:#B43C3C}
+  .mc-cell .r{font-weight:500}
+  .mc-cell .p{display:block;font-size:.7rem;color:var(--text-light)}
+  .mc-cell .r.neg{color:#B43C3C}
+
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,24,16,.5);z-index:500;align-items:center;justify-content:center;padding:20px}
   .modal-overlay.show{display:flex}
   .modal{width:100%;max-width:480px;max-height:88vh;overflow:auto;background:var(--white);border-radius:14px;padding:26px}
@@ -163,12 +174,16 @@
       <select class="inp" id="pcElo" onchange="atualizarTributosDoModalPreco()"></select>
     </div>
     <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1"><label>Custo (R$)</label><input class="inp" id="pcCusto" type="number" step="0.01" min="0"></div>
-      <div class="field" style="flex:1"><label>Preço de venda (R$)</label><input class="inp" id="pcPrecoVenda" type="number" step="0.01" min="0"></div>
+      <div class="field" style="flex:1"><label>Custo (R$)</label><input class="inp" id="pcCusto" type="number" step="0.01" min="0" oninput="atualizarMargensModal()"></div>
+      <div class="field" style="flex:1"><label>Preço de venda (R$)</label><input class="inp" id="pcPrecoVenda" type="number" step="0.01" min="0" oninput="atualizarMargensModal()"></div>
     </div>
     <div class="field" style="margin-bottom:10px">
       <label>Tributo aplicado (opcional)</label>
-      <select class="inp" id="pcTributo"><option value="">— nenhum —</option></select>
+      <select class="inp" id="pcTributo" onchange="atualizarMargensModal()"><option value="">— nenhum —</option></select>
+    </div>
+    <div class="margem-box">
+      <h4>Margem de contribuição (calculada, não é salva — sempre reflete os campos acima)</h4>
+      <div class="margem-grid" id="pcMargensGrid"></div>
     </div>
     <div class="field" style="margin-bottom:0"><label>Vigência a partir de</label><input class="inp" id="pcVigencia" type="date"></div>
     <div class="msg" id="precoMsg"></div>
@@ -196,6 +211,36 @@ function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&
 function fmtData(d){ return d ? new Date(d+'T12:00').toLocaleDateString('pt-BR') : '—'; }
 function fmtMoeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
 function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })+'%'; }
+
+// MC Bruta é sobre o faturamento bruto (preço de venda); MC Líquida é sobre a receita líquida de impostos.
+function calcularMargens(custo, precoVenda, aliquota){
+  custo = Number(custo)||0;
+  precoVenda = Number(precoVenda)||0;
+  aliquota = Number(aliquota)||0;
+  const impostos = precoVenda * (aliquota/100);
+  const receitaLiquida = precoVenda - impostos;
+  const mcBrutaR = precoVenda - custo;
+  const mcBrutaPct = precoVenda > 0 ? (mcBrutaR/precoVenda*100) : 0;
+  const mcLiquidaR = receitaLiquida - custo;
+  const mcLiquidaPct = receitaLiquida > 0 ? (mcLiquidaR/receitaLiquida*100) : 0;
+  return { impostos, receitaLiquida, mcBrutaR, mcBrutaPct, mcLiquidaR, mcLiquidaPct };
+}
+
+function atualizarMargensModal(){
+  const grid = $('pcMargensGrid');
+  if(!grid) return;
+  const custo = $('pcCusto').value;
+  const precoVenda = $('pcPrecoVenda').value;
+  const tributoSel = $('pcTributo');
+  const opt = tributoSel ? tributoSel.options[tributoSel.selectedIndex] : null;
+  const aliquota = opt ? Number(opt.dataset.aliquota || 0) : 0;
+  const m = calcularMargens(custo, precoVenda, aliquota);
+  grid.innerHTML =
+    '<div class="margem-item"><div class="lbl">Impostos ('+fmtPct(aliquota)+')</div><div class="val">'+fmtMoeda(m.impostos)+'</div></div>'+
+    '<div class="margem-item"><div class="lbl">Receita Líquida</div><div class="val">'+fmtMoeda(m.receitaLiquida)+'</div></div>'+
+    '<div class="margem-item"><div class="lbl">MC Bruta (s/ faturamento)</div><div class="val'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'<span class="pct">'+fmtPct(m.mcBrutaPct)+'</span></div></div>'+
+    '<div class="margem-item"><div class="lbl">MC Líquida (s/ receita líquida)</div><div class="val'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'<span class="pct">'+fmtPct(m.mcLiquidaPct)+'</span></div></div>';
+}
 function hojeISO(){ return new Date().toISOString().slice(0,10); }
 function fecharModal(id){ $(id).classList.remove('show'); }
 function showMsg(id, txt, tipo){ const m=$(id); m.textContent=txt; m.className='msg'+(txt?' show '+(tipo||''):''); }
@@ -471,6 +516,8 @@ async function carregarPrecosDoProduto(){
 
     const podeEditar = souMaster || status === 'agendado';
     const podeExcluir = souMaster;
+    const aliquotaRow = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
+    const m = calcularMargens(row.custo, row.preco_venda, aliquotaRow);
     const tributoTxt = row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+')' : '—';
     const statusBadge = status === 'vigente' ? '<span class="badge badge-vigente">Vigente</span>'
       : status === 'agendado' ? '<span class="badge badge-agendado">Agendado</span>'
@@ -481,6 +528,8 @@ async function carregarPrecosDoProduto(){
       '<td>'+fmtMoeda(row.custo)+'</td>'+
       '<td>'+fmtMoeda(row.preco_venda)+'</td>'+
       '<td>'+tributoTxt+'</td>'+
+      '<td class="mc-cell"><span class="r'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'</span><span class="p">'+fmtPct(m.mcBrutaPct)+'</span></td>'+
+      '<td class="mc-cell"><span class="r'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'</span><span class="p">'+fmtPct(m.mcLiquidaPct)+'</span></td>'+
       '<td>'+fmtData(row.vigencia_inicio)+'</td>'+
       '<td>'+statusBadge+'</td>'+
       '<td style="white-space:nowrap">'+
@@ -497,7 +546,7 @@ async function carregarPrecosDoProduto(){
         '<button class="btn" onclick="abrirNovoPreco()">+ Novo Preço</button>'+
       '</div>'+
       (precosCache.length ?
-        '<table><thead><tr><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table>'
+        '<div style="overflow-x:auto"><table><thead><tr><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div>'
         : '<div class="empty">Nenhum preço cadastrado ainda pra este produto.</div>')+
     '</div>';
 }
@@ -505,9 +554,10 @@ async function carregarPrecosDoProduto(){
 async function popularSelectTributosDoElo(elo, selecionadoId){
   const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', elo).order('categoria');
   const sel = $('pcTributo');
-  if(error){ sel.innerHTML = '<option value="">— erro ao carregar —</option>'; return; }
-  sel.innerHTML = '<option value="">— nenhum —</option>'+
-    (data||[]).map(t => '<option value="'+t.id+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
+  if(error){ sel.innerHTML = '<option value="">— erro ao carregar —</option>'; atualizarMargensModal(); return; }
+  sel.innerHTML = '<option value="" data-aliquota="0">— nenhum —</option>'+
+    (data||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
+  atualizarMargensModal();
 }
 
 function atualizarTributosDoModalPreco(){
