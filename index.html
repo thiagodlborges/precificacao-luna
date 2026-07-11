@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luna — Precificação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bordo:#6B1E2E; --bordo-dark:#4A1220; --bordo-light:#8B3345;
+    --creme:#F5EFE4; --creme-dark:#EDE4D4; --marrom:#A0785A;
+    --marrom-light:#C4A882; --marrom-dark:#7A5840;
+    --text:#2C1810; --text-light:#6B4F3A; --white:#FDFAF6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Jost',sans-serif;background:var(--creme);color:var(--text);min-height:100vh}
+  a{color:inherit}
+
+  #carregandoOverlay{position:fixed;inset:0;z-index:99999;background:linear-gradient(145deg,#4A1220 0%,#2C0A14 60%,#1A0008 100%);display:flex;align-items:center;justify-content:center;color:#C4A882;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:20px}
+
+  #appRoot{display:none}
+  header{background:var(--bordo);color:var(--creme);padding:14px 26px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;box-shadow:0 2px 14px rgba(74,18,32,.25)}
+  .brand{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.4rem}
+  .brand-sub{font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--marrom-light);margin-top:-2px}
+  header .spacer{flex:1}
+  .hbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:var(--creme);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:.78rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .15s}
+  .hbtn:hover{background:rgba(255,255,255,.22)}
+
+  nav.tabs{display:flex;gap:2px;background:var(--white);border-bottom:1px solid var(--creme-dark);padding:0 26px;overflow-x:auto}
+  .tab{padding:14px 18px;font-size:.82rem;font-weight:500;color:var(--text-light);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  .tab.active{color:var(--bordo);border-bottom-color:var(--bordo);font-weight:600}
+
+  main{max-width:1140px;margin:0 auto;padding:28px 26px 60px}
+  .card{background:var(--white);border:1px solid var(--creme-dark);border-radius:12px;padding:22px;margin-bottom:18px}
+  .card h2{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--bordo-dark);margin-bottom:14px}
+  .card p.hint{font-size:.82rem;color:var(--text-light);margin-bottom:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);font-weight:500}
+  .inp,select.inp,textarea.inp{padding:9px 12px;border:1.5px solid var(--creme-dark);border-radius:7px;font-family:'Jost',sans-serif;font-size:.85rem;color:var(--text);background:var(--white)}
+  .inp:focus{outline:none;border-color:var(--marrom)}
+  .inp:disabled{opacity:.55}
+  .btn{background:var(--bordo);color:var(--creme);border:none;padding:10px 18px;border-radius:7px;font-size:.78rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:background .15s}
+  .btn:hover{background:var(--bordo-dark)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn-outline{background:none;border:1.5px solid var(--bordo);color:var(--bordo)}
+  .btn-outline:hover{background:var(--bordo);color:var(--creme)}
+  .btn-danger{background:none;border:none;color:#B43C3C;cursor:pointer;font-size:.85rem}
+  .btn-sm{padding:6px 12px;font-size:.72rem}
+
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th{text-align:left;padding:9px 10px;background:var(--creme);color:var(--text-light);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em}
+  td{padding:9px 10px;border-top:1px solid var(--creme-dark);vertical-align:top}
+  tr.inativo td{color:var(--text-light);opacity:.6}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.68rem;font-weight:600;white-space:nowrap}
+  .badge-ativo{background:#E8F8F0;color:#27AE60}
+  .badge-inativo{background:#FDEDEC;color:#B43C3C}
+  .badge-tipo{background:var(--creme);color:var(--marrom-dark)}
+  .badge-vigente{background:#E8F8F0;color:#27AE60}
+  .badge-agendado{background:#FEF6E7;color:#B8860B}
+  .badge-historico{background:var(--creme);color:var(--text-light)}
+
+  .empty{text-align:center;padding:40px;color:var(--text-light);font-size:.85rem}
+  .loading{text-align:center;padding:30px;color:var(--text-light)}
+
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,24,16,.5);z-index:500;align-items:center;justify-content:center;padding:20px}
+  .modal-overlay.show{display:flex}
+  .modal{width:100%;max-width:480px;max-height:88vh;overflow:auto;background:var(--white);border-radius:14px;padding:26px}
+  .modal h3{font-family:'Cormorant Garamond',serif;font-size:1.25rem;color:var(--bordo-dark);margin-bottom:14px}
+  .modal-actions{display:flex;gap:10px;margin-top:16px}
+  .modal-close{background:none;border:none;color:var(--marrom-dark);text-decoration:underline;cursor:pointer;font-size:.78rem;display:block;margin:14px auto 0}
+  .msg{font-size:.78rem;margin-top:8px;display:none}
+  .msg.show{display:block}
+  .msg.err{color:#B43C3C}
+  .msg.ok{color:#27AE60}
+</style>
+</head>
+<body>
+
+<div id="carregandoOverlay">Carregando…</div>
+
+<div id="appRoot">
+<header>
+  <div>
+    <div class="brand">LUNA <span style="font-size:.7em;font-weight:400">Precificação</span></div>
+    <div class="brand-sub">Custo, preço e tributos</div>
+  </div>
+  <div class="spacer"></div>
+  <a href="https://thiagodlborges.github.io/Sistema-Luna/" class="hbtn">← Sistema Luna</a>
+  <button class="hbtn" onclick="sairApp()">Sair</button>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" id="tabProdutos" data-tab="produtos" onclick="mudarTab('produtos')">📦 Produtos</div>
+  <div class="tab" id="tabTributos" data-tab="tributos" onclick="mudarTab('tributos')">🧾 Tributos</div>
+  <div class="tab" id="tabPrecos" data-tab="precos" onclick="mudarTab('precos')">💲 Preços</div>
+</nav>
+
+<main id="mainContent"><div class="loading">Carregando…</div></main>
+</div>
+
+<!-- MODAL: Novo/editar produto -->
+<div class="modal-overlay" id="modalProduto">
+  <div class="modal">
+    <h3 id="tituloProduto">Novo Produto</h3>
+    <div class="field" style="margin-bottom:10px"><label>Nome</label><input class="inp" id="pdNome" placeholder="Ex: Gelato Chocolate, Pote 500ml, Água mineral"></div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="field" style="flex:1">
+        <label>Categoria</label>
+        <input class="inp" id="pdCategoria" placeholder="Gelato, Pote, Picolé, Bebida...">
+      </div>
+      <div class="field" style="flex:1">
+        <label>Origem</label>
+        <select class="inp" id="pdOrigem" onchange="onOrigemProdutoChange()">
+          <option value="fabrica">Fábrica (2 elos: fábrica→loja e loja→consumidor)</option>
+          <option value="revenda">Revenda (1 elo: compra→revenda)</option>
+        </select>
+      </div>
+    </div>
+    <label id="pdAtivoWrap" style="display:none;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">
+      <input type="checkbox" id="pdAtivo" style="width:16px;height:16px" checked> Produto ativo
+    </label>
+    <div class="msg" id="produtoMsg"></div>
+    <div class="modal-actions"><button class="btn" onclick="salvarProduto()" id="btnSalvarProduto">Salvar</button></div>
+    <button class="modal-close" onclick="fecharModal('modalProduto')">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL: Novo/editar tributo -->
+<div class="modal-overlay" id="modalTributo">
+  <div class="modal">
+    <h3 id="tituloTributo">Novo Tributo</h3>
+    <div class="row" style="margin-bottom:10px">
+      <div class="field" style="flex:1">
+        <label>Elo</label>
+        <select class="inp" id="trElo">
+          <option value="fabrica_loja">Fábrica → Loja</option>
+          <option value="loja_consumidor">Loja → Consumidor</option>
+          <option value="compra_revenda">Compra → Revenda</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1"><label>Categoria</label><input class="inp" id="trCategoria" placeholder="Gelato, Bebida..."></div>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="field" style="flex:1"><label>Tipo de tributo</label><input class="inp" id="trTipo" placeholder="ICMS, Simples, ISS..."></div>
+      <div class="field" style="flex:1"><label>Alíquota (%)</label><input class="inp" id="trAliquota" type="number" step="0.01" min="0"></div>
+    </div>
+    <div class="field" style="margin-bottom:0"><label>Vigência a partir de</label><input class="inp" id="trVigencia" type="date"></div>
+    <div class="msg" id="tributoMsg"></div>
+    <div class="modal-actions"><button class="btn" onclick="salvarTributo()" id="btnSalvarTributo">Salvar</button></div>
+    <button class="modal-close" onclick="fecharModal('modalTributo')">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL: Novo/editar preço -->
+<div class="modal-overlay" id="modalPreco">
+  <div class="modal">
+    <h3 id="tituloPreco">Novo Preço</h3>
+    <p class="hint" style="margin-bottom:10px" id="pcProdutoNome"></p>
+    <div class="field" style="margin-bottom:10px">
+      <label>Elo</label>
+      <select class="inp" id="pcElo" onchange="atualizarTributosDoModalPreco()"></select>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="field" style="flex:1"><label>Custo (R$)</label><input class="inp" id="pcCusto" type="number" step="0.01" min="0"></div>
+      <div class="field" style="flex:1"><label>Preço de venda (R$)</label><input class="inp" id="pcPrecoVenda" type="number" step="0.01" min="0"></div>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label>Tributo aplicado (opcional)</label>
+      <select class="inp" id="pcTributo"><option value="">— nenhum —</option></select>
+    </div>
+    <div class="field" style="margin-bottom:0"><label>Vigência a partir de</label><input class="inp" id="pcVigencia" type="date"></div>
+    <div class="msg" id="precoMsg"></div>
+    <div class="modal-actions"><button class="btn" onclick="salvarPreco()" id="btnSalvarPreco">Salvar</button></div>
+    <button class="modal-close" onclick="fecharModal('modalPreco')">Cancelar</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://pbuhwpcpdcnaheaywmdv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidWh3cGNwZGNuYWhlYXl3bWR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjU5MzksImV4cCI6MjA5MTg0MTkzOX0.Mg4PVg96ZiV3C2Rn0GLQU9c7ui_41OlU6Ldqn5jcvyY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const PORTAL_URL = 'https://thiagodlborges.github.io/Sistema-Luna/';
+const $ = id => document.getElementById(id);
+
+const ELOS_POR_ORIGEM = { fabrica: ['fabrica_loja','loja_consumidor'], revenda: ['compra_revenda'] };
+const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda' };
+
+let meuPerfil = null;
+let souMaster = false;
+let currentTab = 'produtos';
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtData(d){ return d ? new Date(d+'T12:00').toLocaleDateString('pt-BR') : '—'; }
+function fmtMoeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })+'%'; }
+function hojeISO(){ return new Date().toISOString().slice(0,10); }
+function fecharModal(id){ $(id).classList.remove('show'); }
+function showMsg(id, txt, tipo){ const m=$(id); m.textContent=txt; m.className='msg'+(txt?' show '+(tipo||''):''); }
+
+async function sairApp(){
+  await sb.auth.signOut();
+  window.location.href = PORTAL_URL;
+}
+
+async function verificarAcessoEIniciar(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = PORTAL_URL; return; }
+
+  const { data: perfil, error } = await sb.from('perfis').select('*').eq('id', session.user.id).single();
+  if (error || !perfil) { window.location.href = PORTAL_URL; return; }
+
+  souMaster = perfil.tipo === 'master';
+  const souBackoffice = souMaster || perfil.precificacao_backoffice === true;
+  if (!souBackoffice) { await sb.auth.signOut(); window.location.href = PORTAL_URL; return; }
+
+  meuPerfil = perfil;
+  document.getElementById('appRoot').style.display = 'block';
+  document.getElementById('carregandoOverlay').remove();
+  renderTab();
+}
+
+function mudarTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===tab));
+  renderTab();
+}
+
+function renderTab(){
+  if(currentTab==='produtos') renderProdutos();
+  else if(currentTab==='tributos') renderTributos();
+  else if(currentTab==='precos') renderPrecos();
+}
+
+// ── PRODUTOS ───────────────────────────────────────────────
+let produtoEditandoId = null;
+let produtosCache = [];
+
+async function renderProdutos(){
+  const el = $('mainContent');
+  el.innerHTML =
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+        '<h2 style="margin:0">Produtos</h2>'+
+        '<button class="btn" onclick="abrirNovoProduto()">+ Novo Produto</button>'+
+      '</div>'+
+      '<p class="hint">Produtos de fábrica têm dois elos de preço (fábrica→loja e loja→consumidor). Produtos de revenda têm só compra→revenda.</p>'+
+      '<div id="produtosTabela" class="loading">Carregando…</div>'+
+    '</div>';
+  await carregarProdutos();
+}
+
+async function carregarProdutos(){
+  const { data, error } = await sb.from('precificacao_produtos').select('*').order('nome');
+  if(error){ $('produtosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
+  produtosCache = data || [];
+  if(!produtosCache.length){ $('produtosTabela').innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'; return; }
+
+  $('produtosTabela').innerHTML =
+    '<table><thead><tr><th>Nome</th><th>Categoria</th><th>Origem</th><th>Status</th><th></th></tr></thead><tbody>'+
+      produtosCache.map(p => (
+        '<tr class="'+(p.ativo?'':'inativo')+'">'+
+          '<td>'+esc(p.nome)+'</td>'+
+          '<td>'+esc(p.categoria)+'</td>'+
+          '<td><span class="badge badge-tipo">'+(p.origem==='fabrica'?'Fábrica':'Revenda')+'</span></td>'+
+          '<td>'+(p.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
+          '<td style="white-space:nowrap">'+
+            '<button class="btn-outline btn btn-sm" onclick="abrirEditarProduto(\''+p.id+'\')">Editar</button> '+
+            '<button class="btn-danger" onclick="toggleAtivoProduto(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Desativar':'Reativar')+'</button>'+
+          '</td>'+
+        '</tr>'
+      )).join('')+
+    '</tbody></table>';
+}
+
+function onOrigemProdutoChange(){} // reservado — sem dependências hoje
+
+function abrirNovoProduto(){
+  produtoEditandoId = null;
+  $('tituloProduto').textContent = 'Novo Produto';
+  $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='fabrica';
+  $('pdAtivoWrap').style.display = 'none';
+  showMsg('produtoMsg','','');
+  $('modalProduto').classList.add('show');
+}
+
+function abrirEditarProduto(id){
+  const p = produtosCache.find(x => x.id === id);
+  if(!p) return;
+  produtoEditandoId = id;
+  $('tituloProduto').textContent = 'Editar Produto';
+  $('pdNome').value = p.nome; $('pdCategoria').value = p.categoria; $('pdOrigem').value = p.origem;
+  $('pdAtivoWrap').style.display = 'flex'; $('pdAtivo').checked = !!p.ativo;
+  showMsg('produtoMsg','','');
+  $('modalProduto').classList.add('show');
+}
+
+async function salvarProduto(){
+  const nome = $('pdNome').value.trim();
+  const categoria = $('pdCategoria').value.trim();
+  const origem = $('pdOrigem').value;
+  if(!nome || !categoria){ showMsg('produtoMsg','Preencha nome e categoria.','err'); return; }
+
+  const payload = { nome, categoria, origem };
+  if(produtoEditandoId) payload.ativo = $('pdAtivo').checked;
+
+  const btn = $('btnSalvarProduto');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let error;
+  if(produtoEditandoId){
+    ({ error } = await sb.from('precificacao_produtos').update(payload).eq('id', produtoEditandoId));
+  } else {
+    ({ error } = await sb.from('precificacao_produtos').insert({ ...payload, ativo: true }));
+  }
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(error){ showMsg('produtoMsg','Erro: '+error.message,'err'); return; }
+  fecharModal('modalProduto');
+  renderProdutos();
+}
+
+async function toggleAtivoProduto(id, novoValor){
+  const { error } = await sb.from('precificacao_produtos').update({ ativo: novoValor }).eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  renderProdutos();
+}
+
+// ── TRIBUTOS ───────────────────────────────────────────────
+let tributoEditandoId = null;
+let tributosCache = [];
+
+async function renderTributos(){
+  const el = $('mainContent');
+  el.innerHTML =
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+        '<h2 style="margin:0">Tributos</h2>'+
+        '<button class="btn" onclick="abrirNovoTributo()">+ Novo Tributo</button>'+
+      '</div>'+
+      '<p class="hint">Um tributo é sempre um par (elo, categoria). Ele fica disponível pra ser aplicado num preço desse elo.</p>'+
+      '<div id="tributosTabela" class="loading">Carregando…</div>'+
+    '</div>';
+  await carregarTributos();
+}
+
+async function carregarTributos(){
+  const { data, error } = await sb.from('precificacao_tributos').select('*').order('elo').order('categoria').order('vigencia_inicio', { ascending:false });
+  if(error){ $('tributosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
+  tributosCache = data || [];
+  if(!tributosCache.length){ $('tributosTabela').innerHTML = '<div class="empty">Nenhum tributo cadastrado ainda.</div>'; return; }
+
+  $('tributosTabela').innerHTML =
+    '<table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Vigência desde</th><th></th></tr></thead><tbody>'+
+      tributosCache.map(t => (
+        '<tr>'+
+          '<td><span class="badge badge-tipo">'+ELO_LABEL[t.elo]+'</span></td>'+
+          '<td>'+esc(t.categoria)+'</td>'+
+          '<td>'+esc(t.tipo_tributo)+'</td>'+
+          '<td>'+fmtPct(t.aliquota)+'</td>'+
+          '<td>'+fmtData(t.vigencia_inicio)+'</td>'+
+          '<td style="white-space:nowrap">'+
+            '<button class="btn-outline btn btn-sm" onclick="abrirEditarTributo(\''+t.id+'\')">Editar</button> '+
+            (souMaster ? '<button class="btn-danger" onclick="excluirTributo(\''+t.id+'\')">🗑️</button>' : '')+
+          '</td>'+
+        '</tr>'
+      )).join('')+
+    '</tbody></table>';
+}
+
+function abrirNovoTributo(){
+  tributoEditandoId = null;
+  $('tituloTributo').textContent = 'Novo Tributo';
+  $('trElo').value='fabrica_loja'; $('trCategoria').value=''; $('trTipo').value=''; $('trAliquota').value=''; $('trVigencia').value=hojeISO();
+  showMsg('tributoMsg','','');
+  $('modalTributo').classList.add('show');
+}
+
+function abrirEditarTributo(id){
+  const t = tributosCache.find(x => x.id === id);
+  if(!t) return;
+  tributoEditandoId = id;
+  $('tituloTributo').textContent = 'Editar Tributo';
+  $('trElo').value = t.elo; $('trCategoria').value = t.categoria; $('trTipo').value = t.tipo_tributo;
+  $('trAliquota').value = t.aliquota; $('trVigencia').value = t.vigencia_inicio;
+  showMsg('tributoMsg','','');
+  $('modalTributo').classList.add('show');
+}
+
+async function salvarTributo(){
+  const elo = $('trElo').value;
+  const categoria = $('trCategoria').value.trim();
+  const tipo_tributo = $('trTipo').value.trim();
+  const aliquota = Number($('trAliquota').value);
+  const vigencia_inicio = $('trVigencia').value;
+  if(!categoria || !tipo_tributo){ showMsg('tributoMsg','Preencha categoria e tipo de tributo.','err'); return; }
+  if(!vigencia_inicio){ showMsg('tributoMsg','Informe a vigência.','err'); return; }
+
+  const payload = { elo, categoria, tipo_tributo, aliquota, vigencia_inicio };
+  const btn = $('btnSalvarTributo');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let error;
+  if(tributoEditandoId){
+    ({ error } = await sb.from('precificacao_tributos').update(payload).eq('id', tributoEditandoId));
+  } else {
+    ({ error } = await sb.from('precificacao_tributos').insert(payload));
+  }
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(error){ showMsg('tributoMsg','Erro: '+error.message,'err'); return; }
+  fecharModal('modalTributo');
+  renderTributos();
+}
+
+async function excluirTributo(id){
+  if(!confirm('Excluir este tributo? Preços que já o referenciam mantêm o histórico, só a referência fica órfã.')) return;
+  const { error } = await sb.from('precificacao_tributos').delete().eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  renderTributos();
+}
+
+// ── PREÇOS ─────────────────────────────────────────────────
+let precoEditandoId = null;
+let produtoSelecionadoPrecos = null;
+let precosCache = [];
+
+async function renderPrecos(){
+  const el = $('mainContent');
+  const { data: produtos, error } = await sb.from('precificacao_produtos').select('*').eq('ativo', true).order('nome');
+  if(error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(error.message)+'</div></div>'; return; }
+
+  el.innerHTML =
+    '<div class="card">'+
+      '<div class="field" style="max-width:420px;margin-bottom:0">'+
+        '<label>Produto</label>'+
+        '<select class="inp" id="precosProdutoSel" onchange="onProdutoPrecosChange()">'+
+          '<option value="">Selecione um produto…</option>'+
+          (produtos||[]).map(p=>'<option value="'+p.id+'">'+esc(p.nome)+' ('+esc(p.categoria)+')</option>').join('')+
+        '</select>'+
+      '</div>'+
+    '</div>'+
+    '<div id="precosConteudo"></div>';
+
+  window.__produtosAtivosCache = produtos || [];
+}
+
+function onProdutoPrecosChange(){
+  const id = $('precosProdutoSel').value;
+  produtoSelecionadoPrecos = (window.__produtosAtivosCache||[]).find(p => p.id === id) || null;
+  if(!produtoSelecionadoPrecos){ $('precosConteudo').innerHTML = ''; return; }
+  carregarPrecosDoProduto();
+}
+
+async function carregarPrecosDoProduto(){
+  const conteudo = $('precosConteudo');
+  conteudo.innerHTML = '<div class="card"><div class="loading">Carregando…</div></div>';
+  const { data, error } = await sb.from('precificacao_precos')
+    .select('*, precificacao_tributos(categoria, tipo_tributo, aliquota)')
+    .eq('produto_id', produtoSelecionadoPrecos.id)
+    .order('elo').order('vigencia_inicio', { ascending:false });
+  if(error){ conteudo.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(error.message)+'</div></div>'; return; }
+  precosCache = data || [];
+
+  const hoje = hojeISO();
+  const linhas = precosCache.map(row => {
+    const mesmoElo = precosCache.filter(r => r.elo === row.elo);
+    const vigentes = mesmoElo.filter(r => r.vigencia_inicio <= hoje).sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio));
+    const atual = vigentes[0];
+    let status = 'historico';
+    if(row.vigencia_inicio > hoje) status = 'agendado';
+    else if(atual && atual.id === row.id) status = 'vigente';
+
+    const podeEditar = souMaster || status === 'agendado';
+    const podeExcluir = souMaster;
+    const tributoTxt = row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+')' : '—';
+    const statusBadge = status === 'vigente' ? '<span class="badge badge-vigente">Vigente</span>'
+      : status === 'agendado' ? '<span class="badge badge-agendado">Agendado</span>'
+      : '<span class="badge badge-historico">Histórico</span>';
+
+    return '<tr>'+
+      '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
+      '<td>'+fmtMoeda(row.custo)+'</td>'+
+      '<td>'+fmtMoeda(row.preco_venda)+'</td>'+
+      '<td>'+tributoTxt+'</td>'+
+      '<td>'+fmtData(row.vigencia_inicio)+'</td>'+
+      '<td>'+statusBadge+'</td>'+
+      '<td style="white-space:nowrap">'+
+        (podeEditar ? '<button class="btn-outline btn btn-sm" onclick="abrirEditarPreco(\''+row.id+'\')">Editar</button> ' : '')+
+        (podeExcluir ? '<button class="btn-danger" onclick="excluirPreco(\''+row.id+'\')">🗑️</button>' : '')+
+      '</td>'+
+    '</tr>';
+  }).join('');
+
+  $('precosConteudo').innerHTML =
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+        '<h2 style="margin:0">'+esc(produtoSelecionadoPrecos.nome)+'</h2>'+
+        '<button class="btn" onclick="abrirNovoPreco()">+ Novo Preço</button>'+
+      '</div>'+
+      (precosCache.length ?
+        '<table><thead><tr><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table>'
+        : '<div class="empty">Nenhum preço cadastrado ainda pra este produto.</div>')+
+    '</div>';
+}
+
+async function popularSelectTributosDoElo(elo, selecionadoId){
+  const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', elo).order('categoria');
+  const sel = $('pcTributo');
+  if(error){ sel.innerHTML = '<option value="">— erro ao carregar —</option>'; return; }
+  sel.innerHTML = '<option value="">— nenhum —</option>'+
+    (data||[]).map(t => '<option value="'+t.id+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
+}
+
+function atualizarTributosDoModalPreco(){
+  popularSelectTributosDoElo($('pcElo').value, null);
+}
+
+function abrirNovoPreco(){
+  if(!produtoSelecionadoPrecos) return;
+  precoEditandoId = null;
+  $('tituloPreco').textContent = 'Novo Preço';
+  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+(produtoSelecionadoPrecos.origem==='fabrica'?'Fábrica':'Revenda');
+  const elos = ELOS_POR_ORIGEM[produtoSelecionadoPrecos.origem];
+  $('pcElo').innerHTML = elos.map(e => '<option value="'+e+'">'+ELO_LABEL[e]+'</option>').join('');
+  $('pcElo').disabled = false;
+  $('pcCusto').value=''; $('pcPrecoVenda').value=''; $('pcVigencia').value=hojeISO();
+  popularSelectTributosDoElo(elos[0], null);
+  showMsg('precoMsg','','');
+  $('modalPreco').classList.add('show');
+}
+
+function abrirEditarPreco(id){
+  const row = precosCache.find(x => x.id === id);
+  if(!row) return;
+  precoEditandoId = id;
+  $('tituloPreco').textContent = 'Editar Preço';
+  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+ELO_LABEL[row.elo];
+  $('pcElo').innerHTML = '<option value="'+row.elo+'">'+ELO_LABEL[row.elo]+'</option>';
+  $('pcElo').disabled = true;
+  $('pcCusto').value = row.custo; $('pcPrecoVenda').value = row.preco_venda; $('pcVigencia').value = row.vigencia_inicio;
+  popularSelectTributosDoElo(row.elo, row.tributo_aplicado_id);
+  showMsg('precoMsg','','');
+  $('modalPreco').classList.add('show');
+}
+
+async function salvarPreco(){
+  const elo = $('pcElo').value;
+  const custo = Number($('pcCusto').value);
+  const preco_venda = Number($('pcPrecoVenda').value);
+  const tributo_aplicado_id = $('pcTributo').value || null;
+  const vigencia_inicio = $('pcVigencia').value;
+  if(!vigencia_inicio){ showMsg('precoMsg','Informe a vigência.','err'); return; }
+  if(custo < 0 || preco_venda < 0){ showMsg('precoMsg','Custo e preço de venda precisam ser válidos.','err'); return; }
+
+  const btn = $('btnSalvarPreco');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let error;
+  if(precoEditandoId){
+    ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, tributo_aplicado_id, vigencia_inicio }).eq('id', precoEditandoId));
+  } else {
+    ({ error } = await sb.from('precificacao_precos').insert({
+      produto_id: produtoSelecionadoPrecos.id, elo, custo, preco_venda, tributo_aplicado_id, vigencia_inicio,
+      criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
+    }));
+  }
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(error){ showMsg('precoMsg','Erro: '+error.message,'err'); return; }
+  fecharModal('modalPreco');
+  carregarPrecosDoProduto();
+}
+
+async function excluirPreco(id){
+  if(!confirm('Excluir este registro de preço? Essa ação é permanente.')) return;
+  const { error } = await sb.from('precificacao_precos').delete().eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  carregarPrecosDoProduto();
+}
+
+verificarAcessoEIniciar();
+</script>
+</body>
+</html>
