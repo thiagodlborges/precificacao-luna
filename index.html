@@ -60,6 +60,8 @@
   .badge-vigente{background:#E8F8F0;color:#27AE60}
   .badge-agendado{background:#FEF6E7;color:#B8860B}
   .badge-historico{background:var(--creme);color:var(--text-light)}
+  .badge-pendente{background:#EAF2FB;color:#2E6DA4}
+  .badge-rejeitado{background:#FDEDEC;color:#B43C3C}
 
   .empty{text-align:center;padding:40px;color:var(--text-light);font-size:.85rem}
   .loading{text-align:center;padding:30px;color:var(--text-light)}
@@ -106,6 +108,7 @@
   <div class="tab active" id="tabProdutos" data-tab="produtos" onclick="mudarTab('produtos')">📦 Produtos</div>
   <div class="tab" id="tabTributos" data-tab="tributos" onclick="mudarTab('tributos')">🧾 Tributos</div>
   <div class="tab" id="tabPrecos" data-tab="precos" onclick="mudarTab('precos')">💲 Preços</div>
+  <div class="tab" id="tabAprovacoes" data-tab="aprovacoes" onclick="mudarTab('aprovacoes')">✅ Aprovações<span id="badgePendentes"></span></div>
 </nav>
 
 <main id="mainContent"><div class="loading">Carregando…</div></main>
@@ -225,6 +228,7 @@ const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja �
 
 let meuPerfil = null;
 let souMaster = false;
+let souBackofficePrecificacao = false;
 let currentTab = 'produtos';
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -288,11 +292,22 @@ async function verificarAcessoEIniciar(){
   souMaster = perfil.tipo === 'master';
   const souBackoffice = souMaster || perfil.precificacao_backoffice === true;
   if (!souBackoffice) { await sb.auth.signOut(); window.location.href = PORTAL_URL; return; }
+  souBackofficePrecificacao = souBackoffice;
 
   meuPerfil = perfil;
   document.getElementById('appRoot').style.display = 'block';
   document.getElementById('carregandoOverlay').remove();
   renderTab();
+  atualizarBadgePendentes();
+}
+
+async function atualizarBadgePendentes(){
+  const [pR, tR] = await Promise.all([
+    sb.from('precificacao_precos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
+    sb.from('precificacao_tributos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
+  ]);
+  const total = (pR.count || 0) + (tR.count || 0);
+  $('badgePendentes').innerHTML = total > 0 ? ' <span class="badge badge-pendente">'+total+'</span>' : '';
 }
 
 function mudarTab(tab){
@@ -305,6 +320,7 @@ function renderTab(){
   if(currentTab==='produtos') renderProdutos();
   else if(currentTab==='tributos') renderTributos();
   else if(currentTab==='precos') renderPrecos();
+  else if(currentTab==='aprovacoes') renderAprovacoes();
 }
 
 // ── PRODUTOS ───────────────────────────────────────────────
@@ -341,7 +357,8 @@ async function carregarProdutos(){
           '<td>'+(p.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
           '<td style="white-space:nowrap">'+
             '<button class="btn-outline btn btn-sm" onclick="abrirEditarProduto(\''+p.id+'\')">Editar</button> '+
-            '<button class="btn-danger" onclick="toggleAtivoProduto(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Desativar':'Reativar')+'</button>'+
+            '<button class="btn-danger" onclick="toggleAtivoProduto(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Desativar':'Reativar')+'</button> '+
+            (souMaster ? '<button class="btn-danger" onclick="excluirProduto(\''+p.id+'\')">🗑️</button>' : '')+
           '</td>'+
         '</tr>'
       )).join('')+
@@ -399,6 +416,13 @@ async function toggleAtivoProduto(id, novoValor){
   renderProdutos();
 }
 
+async function excluirProduto(id){
+  if(!confirm('Excluir este produto e todo o histórico de preços dele? Essa ação é permanente.')) return;
+  const { error } = await sb.from('precificacao_produtos').delete().eq('id', id);
+  if(error){ alert('Erro: '+error.message+(error.message.includes('foreign key')?' — apague antes os preços desse produto no histórico.':'')); return; }
+  renderProdutos();
+}
+
 // ── TRIBUTOS ───────────────────────────────────────────────
 let tributoEditandoId = null;
 let tributosCache = [];
@@ -411,7 +435,7 @@ async function renderTributos(){
         '<h2 style="margin:0">Tributos</h2>'+
         '<button class="btn" onclick="abrirNovoTributo()">+ Novo Tributo</button>'+
       '</div>'+
-      '<p class="hint">Um tributo é sempre um par (elo, categoria). Ele fica disponível pra ser aplicado num preço desse elo.</p>'+
+      '<p class="hint">Um tributo é sempre um par (elo, categoria). '+(souMaster ? 'Como master, o que você cadastra já entra aprovado.' : 'O que você cadastrar ou editar aqui entra como pendente até o master aprovar — só depois fica disponível pra aplicar num preço.')+'</p>'+
       '<div id="tributosTabela" class="loading">Carregando…</div>'+
     '</div>';
   await carregarTributos();
@@ -424,21 +448,25 @@ async function carregarTributos(){
   if(!tributosCache.length){ $('tributosTabela').innerHTML = '<div class="empty">Nenhum tributo cadastrado ainda.</div>'; return; }
 
   $('tributosTabela').innerHTML =
-    '<table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Créd. Compra</th><th>Vigência desde</th><th></th></tr></thead><tbody>'+
-      tributosCache.map(t => (
-        '<tr>'+
+    '<table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Créd. Compra</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+
+      tributosCache.map(t => {
+        const podeEditar = souMaster || (souBackofficePrecificacao && t.status !== 'aprovado');
+        const podeExcluir = souMaster;
+        const statusLabel = t.status==='aprovado'?'Aprovado':t.status==='pendente'?'Pendente':'Rejeitado';
+        return '<tr>'+
           '<td><span class="badge badge-tipo">'+ELO_LABEL[t.elo]+'</span></td>'+
           '<td>'+esc(t.categoria)+'</td>'+
           '<td>'+esc(t.tipo_tributo)+'</td>'+
           '<td>'+fmtPct(t.aliquota)+'</td>'+
           '<td>'+(Number(t.aliquota_credito)>0 ? fmtPct(t.aliquota_credito) : '—')+'</td>'+
           '<td>'+fmtData(t.vigencia_inicio)+'</td>'+
+          '<td><span class="badge badge-'+t.status+'">'+statusLabel+'</span></td>'+
           '<td style="white-space:nowrap">'+
-            '<button class="btn-outline btn btn-sm" onclick="abrirEditarTributo(\''+t.id+'\')">Editar</button> '+
-            (souMaster ? '<button class="btn-danger" onclick="excluirTributo(\''+t.id+'\')">🗑️</button>' : '')+
+            (podeEditar ? '<button class="btn-outline btn btn-sm" onclick="abrirEditarTributo(\''+t.id+'\')">Editar</button> ' : '')+
+            (podeExcluir ? '<button class="btn-danger" onclick="excluirTributo(\''+t.id+'\')">🗑️</button>' : '')+
           '</td>'+
-        '</tr>'
-      )).join('')+
+        '</tr>';
+      }).join('')+
     '</tbody></table>';
 }
 
@@ -484,6 +512,7 @@ async function salvarTributo(){
   if(error){ showMsg('tributoMsg','Erro: '+error.message,'err'); return; }
   fecharModal('modalTributo');
   renderTributos();
+  atualizarBadgePendentes();
 }
 
 async function excluirTributo(id){
@@ -500,7 +529,7 @@ let precosCache = [];
 
 function precoVigenteDe(todosPrecos, produtoId, elo){
   const hoje = hojeISO();
-  const rows = todosPrecos.filter(r => r.produto_id===produtoId && r.elo===elo && r.vigencia_inicio<=hoje);
+  const rows = todosPrecos.filter(r => r.produto_id===produtoId && r.elo===elo && r.vigencia_inicio<=hoje && r.status==='aprovado');
   if(!rows.length) return null;
   return rows.sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio))[0];
 }
@@ -575,15 +604,19 @@ function renderHistoricoTabela(){
   const hoje = hojeISO();
 
   const linhasInfo = precosCache.map(row => {
-    const mesmoElo = precosCache.filter(r => r.elo === row.elo);
-    const vigentes = mesmoElo.filter(r => r.vigencia_inicio <= hoje).sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio));
-    const atual = vigentes[0];
-    let status = 'historico';
-    if(row.vigencia_inicio > hoje) status = 'agendado';
-    else if(atual && atual.id === row.id) status = 'vigente';
-    const statusLabel = status==='vigente'?'Vigente':status==='agendado'?'Agendado':'Histórico';
+    let status, statusLabel;
+    if(row.status === 'pendente'){ status = 'pendente'; statusLabel = 'Pendente aprovação'; }
+    else if(row.status === 'rejeitado'){ status = 'rejeitado'; statusLabel = 'Rejeitado'; }
+    else {
+      const mesmoEloAprovados = precosCache.filter(r => r.elo === row.elo && r.status === 'aprovado' && r.vigencia_inicio <= hoje)
+        .sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio));
+      const atual = mesmoEloAprovados[0];
+      if(row.vigencia_inicio > hoje){ status = 'agendado'; statusLabel = 'Agendado'; }
+      else if(atual && atual.id === row.id){ status = 'vigente'; statusLabel = 'Vigente'; }
+      else { status = 'historico'; statusLabel = 'Histórico'; }
+    }
 
-    const podeEditar = souMaster || status === 'agendado';
+    const podeEditar = souMaster || (souBackofficePrecificacao && row.status !== 'aprovado' && row.vigencia_inicio >= hoje);
     const podeExcluir = souMaster;
     const aliquotaD = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
     const aliquotaC = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
@@ -623,11 +656,13 @@ function renderHistoricoTabela(){
 
 
 async function popularSelectTributosDoElo(elo, selecionadoId){
-  const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', elo).order('categoria');
+  let query = sb.from('precificacao_tributos').select('*').eq('elo', elo);
+  const { data, error } = await query;
   const sel = $('pcTributo');
   if(error){ sel.innerHTML = '<option value="">— erro ao carregar —</option>'; atualizarMargensModal(); return; }
+  const lista = (data||[]).filter(t => t.status === 'aprovado' || t.id === selecionadoId).sort((a,b) => a.categoria.localeCompare(b.categoria));
   sel.innerHTML = '<option value="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
-    (data||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+')</option>').join('');
+    lista.map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+(t.status!=='aprovado'?' — '+t.status:'')+')</option>').join('');
   atualizarMargensModal();
 }
 
@@ -688,6 +723,7 @@ async function salvarPreco(){
   fecharModal('modalPreco');
   await carregarHistoricoPreco();
   if(currentTab==='precos') renderPrecos();
+  atualizarBadgePendentes();
 }
 
 async function excluirPreco(id){
@@ -696,6 +732,84 @@ async function excluirPreco(id){
   if(error){ alert('Erro: '+error.message); return; }
   await carregarHistoricoPreco();
   if(currentTab==='precos') renderPrecos();
+}
+
+// ── APROVAÇÕES ─────────────────────────────────────────────
+async function renderAprovacoes(){
+  const el = $('mainContent');
+  el.innerHTML = '<div class="loading">Carregando…</div>';
+
+  const [precosR, tributosR] = await Promise.all([
+    sb.from('precificacao_precos').select('*, precificacao_produtos(nome), precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
+    sb.from('precificacao_tributos').select('*').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
+  ]);
+  if(precosR.error || tributosR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro ao carregar aprovações.</div></div>'; return; }
+
+  const precos = precosR.data || [];
+  const tributos = tributosR.data || [];
+  const precosPend = precos.filter(p => p.status==='pendente');
+  const precosRej = precos.filter(p => p.status==='rejeitado');
+  const tribPend = tributos.filter(t => t.status==='pendente');
+  const tribRej = tributos.filter(t => t.status==='rejeitado');
+
+  const acoes = (tabela, id) => souMaster
+    ? '<button class="btn-outline btn btn-sm" onclick="aprovarRejeitar(\''+tabela+'\',\''+id+'\',\'aprovado\')">Aprovar</button> '+
+      '<button class="btn-danger" onclick="aprovarRejeitar(\''+tabela+'\',\''+id+'\',\'rejeitado\')">Rejeitar</button>'
+    : '<span class="badge badge-pendente">Aguardando</span>';
+
+  const tabelaPrecos = (lista, comAcao) => !lista.length ? '<div class="empty">Nada aqui.</div>' :
+    '<div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>Vigência</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
+      lista.map(row => '<tr>'+
+        '<td>'+esc(row.precificacao_produtos ? row.precificacao_produtos.nome : '—')+'</td>'+
+        '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
+        '<td>'+fmtMoeda(row.custo)+'</td>'+
+        '<td>'+fmtMoeda(row.preco_venda)+'</td>'+
+        '<td>'+(row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+')' : '—')+'</td>'+
+        '<td>'+fmtData(row.vigencia_inicio)+'</td>'+
+        '<td>'+esc(row.criado_por_nome||'—')+'</td>'+
+        (comAcao ? '<td style="white-space:nowrap">'+acoes('precificacao_precos', row.id)+'</td>' : '')+
+      '</tr>').join('')+
+    '</tbody></table></div>';
+
+  const tabelaTributos = (lista, comAcao) => !lista.length ? '<div class="empty">Nada aqui.</div>' :
+    '<div style="overflow-x:auto"><table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Créd. Compra</th><th>Vigência</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
+      lista.map(t => '<tr>'+
+        '<td><span class="badge badge-tipo">'+ELO_LABEL[t.elo]+'</span></td>'+
+        '<td>'+esc(t.categoria)+'</td>'+
+        '<td>'+esc(t.tipo_tributo)+'</td>'+
+        '<td>'+fmtPct(t.aliquota)+'</td>'+
+        '<td>'+(Number(t.aliquota_credito)>0?fmtPct(t.aliquota_credito):'—')+'</td>'+
+        '<td>'+fmtData(t.vigencia_inicio)+'</td>'+
+        '<td>'+esc(t.criado_por_nome||'—')+'</td>'+
+        (comAcao ? '<td style="white-space:nowrap">'+acoes('precificacao_tributos', t.id)+'</td>' : '')+
+      '</tr>').join('')+
+    '</tbody></table></div>';
+
+  el.innerHTML =
+    '<div class="card">'+
+      '<h2>Preços pendentes</h2>'+
+      '<p class="hint">Propostas de backoffice — só passam a valer depois de aprovadas.</p>'+
+      tabelaPrecos(precosPend, true)+
+    '</div>'+
+    '<div class="card">'+
+      '<h2>Tributos pendentes</h2>'+
+      tabelaTributos(tribPend, true)+
+    '</div>'+
+    (precosRej.length || tribRej.length ?
+      '<div class="card">'+
+        '<h2>Rejeitados recentemente</h2>'+
+        '<p class="hint">Fica registrado pra quem propôs saber que precisa corrigir e reenviar.</p>'+
+        (precosRej.length ? '<p style="font-size:.78rem;font-weight:600;margin-bottom:8px">Preços</p>'+tabelaPrecos(precosRej, false) : '')+
+        (tribRej.length ? '<p style="font-size:.78rem;font-weight:600;margin:14px 0 8px">Tributos</p>'+tabelaTributos(tribRej, false) : '')+
+      '</div>' : '');
+}
+
+async function aprovarRejeitar(tabela, id, novoStatus){
+  if(novoStatus === 'rejeitado' && !confirm('Rejeitar esta proposta? Quem propôs vai poder corrigir e reenviar.')) return;
+  const { error } = await sb.from(tabela).update({ status: novoStatus }).eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  renderAprovacoes();
+  atualizarBadgePendentes();
 }
 
 verificarAcessoEIniciar();
