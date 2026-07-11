@@ -154,13 +154,33 @@
       <div class="field" style="flex:1"><label>Categoria</label><input class="inp" id="trCategoria" placeholder="Gelato, Bebida..."></div>
     </div>
     <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1"><label>Tipo de tributo</label><input class="inp" id="trTipo" placeholder="ICMS, Simples, ISS..."></div>
-      <div class="field" style="flex:1"><label>Alíquota (%)</label><input class="inp" id="trAliquota" type="number" step="0.01" min="0"></div>
+      <div class="field" style="flex:1"><label>Tipo de tributo</label><input class="inp" id="trTipo" placeholder="ICMS, Simples, ISS, PIS/Cofins..."></div>
+      <div class="field" style="flex:1"><label>Alíquota (%) — débito na venda</label><input class="inp" id="trAliquota" type="number" step="0.01" min="0"></div>
     </div>
+    <div class="field" style="margin-bottom:10px">
+      <label>Alíquota de crédito (%) — recuperável na compra</label>
+      <input class="inp" id="trAliquotaCredito" type="number" step="0.01" min="0" placeholder="0 se este tributo não gera crédito">
+    </div>
+    <p class="hint" style="margin-top:-4px">Preenche só pra tributos recuperáveis no regime não-cumulativo (ex: PIS/Cofins). Pra ICMS, ISS, Simples etc., deixa 0.</p>
     <div class="field" style="margin-bottom:0"><label>Vigência a partir de</label><input class="inp" id="trVigencia" type="date"></div>
     <div class="msg" id="tributoMsg"></div>
     <div class="modal-actions"><button class="btn" onclick="salvarTributo()" id="btnSalvarTributo">Salvar</button></div>
     <button class="modal-close" onclick="fecharModal('modalTributo')">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL: Histórico de preços de um produto -->
+<div class="modal-overlay" id="modalHistorico">
+  <div class="modal" style="max-width:900px;width:96%;max-height:88vh;display:flex;flex-direction:column">
+    <h3 id="tituloHistorico">Histórico de Preços</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <input class="inp" id="historicoFiltro" placeholder="Buscar por elo, tributo, data, status..." style="margin-bottom:0;max-width:320px;flex:1" oninput="renderHistoricoTabela()">
+      <button class="btn" style="width:auto;padding:10px 18px" onclick="abrirNovoPreco()">+ Novo Preço</button>
+    </div>
+    <div style="overflow:auto;flex:1">
+      <div id="historicoConteudo" class="loading">Carregando…</div>
+    </div>
+    <button class="modal-close" onclick="fecharModal('modalHistorico')">Fechar</button>
   </div>
 </div>
 
@@ -213,17 +233,21 @@ function fmtMoeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'cur
 function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })+'%'; }
 
 // MC Bruta é sobre o faturamento bruto (preço de venda); MC Líquida é sobre a receita líquida de impostos.
-function calcularMargens(custo, precoVenda, aliquota){
+// Impostos líquidos = débito (aliquota % sobre preço de venda) − crédito (aliquota_credito % sobre custo, ex: PIS/Cofins não-cumulativo).
+function calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito){
   custo = Number(custo)||0;
   precoVenda = Number(precoVenda)||0;
-  aliquota = Number(aliquota)||0;
-  const impostos = precoVenda * (aliquota/100);
+  aliquotaDebito = Number(aliquotaDebito)||0;
+  aliquotaCredito = Number(aliquotaCredito)||0;
+  const debito = precoVenda * (aliquotaDebito/100);
+  const credito = custo * (aliquotaCredito/100);
+  const impostos = debito - credito;
   const receitaLiquida = precoVenda - impostos;
   const mcBrutaR = precoVenda - custo;
   const mcBrutaPct = precoVenda > 0 ? (mcBrutaR/precoVenda*100) : 0;
   const mcLiquidaR = receitaLiquida - custo;
   const mcLiquidaPct = receitaLiquida > 0 ? (mcLiquidaR/receitaLiquida*100) : 0;
-  return { impostos, receitaLiquida, mcBrutaR, mcBrutaPct, mcLiquidaR, mcLiquidaPct };
+  return { debito, credito, impostos, receitaLiquida, mcBrutaR, mcBrutaPct, mcLiquidaR, mcLiquidaPct };
 }
 
 function atualizarMargensModal(){
@@ -233,10 +257,14 @@ function atualizarMargensModal(){
   const precoVenda = $('pcPrecoVenda').value;
   const tributoSel = $('pcTributo');
   const opt = tributoSel ? tributoSel.options[tributoSel.selectedIndex] : null;
-  const aliquota = opt ? Number(opt.dataset.aliquota || 0) : 0;
-  const m = calcularMargens(custo, precoVenda, aliquota);
+  const aliquotaDebito = opt ? Number(opt.dataset.aliquota || 0) : 0;
+  const aliquotaCredito = opt ? Number(opt.dataset.aliquotaCredito || 0) : 0;
+  const m = calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito);
+  const impostosLbl = aliquotaCredito > 0
+    ? 'Impostos líq. (déb. '+fmtPct(aliquotaDebito)+' venda − créd. '+fmtPct(aliquotaCredito)+' compra)'
+    : 'Impostos ('+fmtPct(aliquotaDebito)+')';
   grid.innerHTML =
-    '<div class="margem-item"><div class="lbl">Impostos ('+fmtPct(aliquota)+')</div><div class="val">'+fmtMoeda(m.impostos)+'</div></div>'+
+    '<div class="margem-item"><div class="lbl">'+impostosLbl+'</div><div class="val">'+fmtMoeda(m.impostos)+'</div></div>'+
     '<div class="margem-item"><div class="lbl">Receita Líquida</div><div class="val">'+fmtMoeda(m.receitaLiquida)+'</div></div>'+
     '<div class="margem-item"><div class="lbl">MC Bruta (s/ faturamento)</div><div class="val'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'<span class="pct">'+fmtPct(m.mcBrutaPct)+'</span></div></div>'+
     '<div class="margem-item"><div class="lbl">MC Líquida (s/ receita líquida)</div><div class="val'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'<span class="pct">'+fmtPct(m.mcLiquidaPct)+'</span></div></div>';
@@ -396,13 +424,14 @@ async function carregarTributos(){
   if(!tributosCache.length){ $('tributosTabela').innerHTML = '<div class="empty">Nenhum tributo cadastrado ainda.</div>'; return; }
 
   $('tributosTabela').innerHTML =
-    '<table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Vigência desde</th><th></th></tr></thead><tbody>'+
+    '<table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Créd. Compra</th><th>Vigência desde</th><th></th></tr></thead><tbody>'+
       tributosCache.map(t => (
         '<tr>'+
           '<td><span class="badge badge-tipo">'+ELO_LABEL[t.elo]+'</span></td>'+
           '<td>'+esc(t.categoria)+'</td>'+
           '<td>'+esc(t.tipo_tributo)+'</td>'+
           '<td>'+fmtPct(t.aliquota)+'</td>'+
+          '<td>'+(Number(t.aliquota_credito)>0 ? fmtPct(t.aliquota_credito) : '—')+'</td>'+
           '<td>'+fmtData(t.vigencia_inicio)+'</td>'+
           '<td style="white-space:nowrap">'+
             '<button class="btn-outline btn btn-sm" onclick="abrirEditarTributo(\''+t.id+'\')">Editar</button> '+
@@ -416,7 +445,7 @@ async function carregarTributos(){
 function abrirNovoTributo(){
   tributoEditandoId = null;
   $('tituloTributo').textContent = 'Novo Tributo';
-  $('trElo').value='fabrica_loja'; $('trCategoria').value=''; $('trTipo').value=''; $('trAliquota').value=''; $('trVigencia').value=hojeISO();
+  $('trElo').value='fabrica_loja'; $('trCategoria').value=''; $('trTipo').value=''; $('trAliquota').value=''; $('trAliquotaCredito').value=''; $('trVigencia').value=hojeISO();
   showMsg('tributoMsg','','');
   $('modalTributo').classList.add('show');
 }
@@ -427,7 +456,7 @@ function abrirEditarTributo(id){
   tributoEditandoId = id;
   $('tituloTributo').textContent = 'Editar Tributo';
   $('trElo').value = t.elo; $('trCategoria').value = t.categoria; $('trTipo').value = t.tipo_tributo;
-  $('trAliquota').value = t.aliquota; $('trVigencia').value = t.vigencia_inicio;
+  $('trAliquota').value = t.aliquota; $('trAliquotaCredito').value = t.aliquota_credito || 0; $('trVigencia').value = t.vigencia_inicio;
   showMsg('tributoMsg','','');
   $('modalTributo').classList.add('show');
 }
@@ -437,11 +466,12 @@ async function salvarTributo(){
   const categoria = $('trCategoria').value.trim();
   const tipo_tributo = $('trTipo').value.trim();
   const aliquota = Number($('trAliquota').value);
+  const aliquota_credito = Number($('trAliquotaCredito').value) || 0;
   const vigencia_inicio = $('trVigencia').value;
   if(!categoria || !tipo_tributo){ showMsg('tributoMsg','Preencha categoria e tipo de tributo.','err'); return; }
   if(!vigencia_inicio){ showMsg('tributoMsg','Informe a vigência.','err'); return; }
 
-  const payload = { elo, categoria, tipo_tributo, aliquota, vigencia_inicio };
+  const payload = { elo, categoria, tipo_tributo, aliquota, aliquota_credito, vigencia_inicio };
   const btn = $('btnSalvarTributo');
   btn.disabled = true; btn.textContent = 'Salvando…';
   let error;
@@ -468,62 +498,102 @@ let precoEditandoId = null;
 let produtoSelecionadoPrecos = null;
 let precosCache = [];
 
+function precoVigenteDe(todosPrecos, produtoId, elo){
+  const hoje = hojeISO();
+  const rows = todosPrecos.filter(r => r.produto_id===produtoId && r.elo===elo && r.vigencia_inicio<=hoje);
+  if(!rows.length) return null;
+  return rows.sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio))[0];
+}
+
 async function renderPrecos(){
   const el = $('mainContent');
-  const { data: produtos, error } = await sb.from('precificacao_produtos').select('*').eq('ativo', true).order('nome');
-  if(error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(error.message)+'</div></div>'; return; }
+  el.innerHTML = '<div class="loading">Carregando…</div>';
 
-  el.innerHTML =
-    '<div class="card">'+
-      '<div class="field" style="max-width:420px;margin-bottom:0">'+
-        '<label>Produto</label>'+
-        '<select class="inp" id="precosProdutoSel" onchange="onProdutoPrecosChange()">'+
-          '<option value="">Selecione um produto…</option>'+
-          (produtos||[]).map(p=>'<option value="'+p.id+'">'+esc(p.nome)+' ('+esc(p.categoria)+')</option>').join('')+
-        '</select>'+
-      '</div>'+
-    '</div>'+
-    '<div id="precosConteudo"></div>';
+  const [prodR, precoR] = await Promise.all([
+    sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
+    sb.from('precificacao_precos').select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)'),
+  ]);
+  if(prodR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(prodR.error.message)+'</div></div>'; return; }
+  if(precoR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(precoR.error.message)+'</div></div>'; return; }
 
-  window.__produtosAtivosCache = produtos || [];
+  const produtos = prodR.data || [];
+  const todosPrecos = precoR.data || [];
+  window.__produtosAtivosCache = produtos;
+
+  if(!produtos.length){ el.innerHTML = '<div class="card"><div class="empty">Nenhum produto ativo cadastrado ainda. Cadastre em "Produtos".</div></div>'; return; }
+
+  const porCategoria = {};
+  produtos.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
+  const categorias = Object.keys(porCategoria).sort();
+
+  el.innerHTML = categorias.map(cat => {
+    const linhas = porCategoria[cat].map(p => {
+      const elos = ELOS_POR_ORIGEM[p.origem];
+      return elos.map((elo, idx) => {
+        const row = precoVigenteDe(todosPrecos, p.id, elo);
+        const aliquotaD = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
+        const aliquotaC = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
+        const m = row ? calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC) : null;
+        return '<tr>'+
+          (idx===0 ? '<td rowspan="'+elos.length+'">'+esc(p.nome)+'</td>' : '')+
+          '<td><span class="badge badge-tipo">'+ELO_LABEL[elo]+'</span></td>'+
+          '<td>'+(row?fmtMoeda(row.custo):'—')+'</td>'+
+          '<td>'+(row?fmtMoeda(row.preco_venda):'—')+'</td>'+
+          (m ? '<td class="mc-cell"><span class="r'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'</span><span class="p">'+fmtPct(m.mcBrutaPct)+'</span></td>' : '<td>—</td>')+
+          (m ? '<td class="mc-cell"><span class="r'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'</span><span class="p">'+fmtPct(m.mcLiquidaPct)+'</span></td>' : '<td>—</td>')+
+          '<td>'+(row?fmtData(row.vigencia_inicio):'—')+'</td>'+
+          '<td style="white-space:nowrap"><button class="btn-outline btn btn-sm" onclick="abrirHistoricoPreco(\''+p.id+'\')">Histórico</button></td>'+
+        '</tr>';
+      }).join('');
+    }).join('');
+    return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigente desde</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div></div>';
+  }).join('');
 }
 
-function onProdutoPrecosChange(){
-  const id = $('precosProdutoSel').value;
-  produtoSelecionadoPrecos = (window.__produtosAtivosCache||[]).find(p => p.id === id) || null;
-  if(!produtoSelecionadoPrecos){ $('precosConteudo').innerHTML = ''; return; }
-  carregarPrecosDoProduto();
+async function abrirHistoricoPreco(produtoId){
+  produtoSelecionadoPrecos = (window.__produtosAtivosCache||[]).find(p => p.id === produtoId) || null;
+  if(!produtoSelecionadoPrecos) return;
+  $('tituloHistorico').textContent = 'Histórico — '+produtoSelecionadoPrecos.nome;
+  $('historicoFiltro').value = '';
+  $('historicoConteudo').innerHTML = '<div class="loading">Carregando…</div>';
+  $('modalHistorico').classList.add('show');
+  await carregarHistoricoPreco();
 }
 
-async function carregarPrecosDoProduto(){
-  const conteudo = $('precosConteudo');
-  conteudo.innerHTML = '<div class="card"><div class="loading">Carregando…</div></div>';
+async function carregarHistoricoPreco(){
   const { data, error } = await sb.from('precificacao_precos')
-    .select('*, precificacao_tributos(categoria, tipo_tributo, aliquota)')
+    .select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)')
     .eq('produto_id', produtoSelecionadoPrecos.id)
     .order('elo').order('vigencia_inicio', { ascending:false });
-  if(error){ conteudo.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(error.message)+'</div></div>'; return; }
+  if(error){ $('historicoConteudo').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
   precosCache = data || [];
+  renderHistoricoTabela();
+}
 
+function renderHistoricoTabela(){
+  const filtro = ($('historicoFiltro').value || '').toLowerCase().trim();
   const hoje = hojeISO();
-  const linhas = precosCache.map(row => {
+
+  const linhasInfo = precosCache.map(row => {
     const mesmoElo = precosCache.filter(r => r.elo === row.elo);
     const vigentes = mesmoElo.filter(r => r.vigencia_inicio <= hoje).sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio));
     const atual = vigentes[0];
     let status = 'historico';
     if(row.vigencia_inicio > hoje) status = 'agendado';
     else if(atual && atual.id === row.id) status = 'vigente';
+    const statusLabel = status==='vigente'?'Vigente':status==='agendado'?'Agendado':'Histórico';
 
     const podeEditar = souMaster || status === 'agendado';
     const podeExcluir = souMaster;
-    const aliquotaRow = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
-    const m = calcularMargens(row.custo, row.preco_venda, aliquotaRow);
-    const tributoTxt = row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+')' : '—';
-    const statusBadge = status === 'vigente' ? '<span class="badge badge-vigente">Vigente</span>'
-      : status === 'agendado' ? '<span class="badge badge-agendado">Agendado</span>'
-      : '<span class="badge badge-historico">Histórico</span>';
+    const aliquotaD = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
+    const aliquotaC = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
+    const m = calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC);
+    const tributoTxt = row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+(aliquotaC>0?', créd. '+fmtPct(aliquotaC):'')+')' : '—';
+    const statusBadge = '<span class="badge badge-'+status+'">'+statusLabel+'</span>';
 
-    return '<tr>'+
+    const searchText = (ELO_LABEL[row.elo]+' '+(row.precificacao_tributos?row.precificacao_tributos.tipo_tributo:'')+' '+fmtData(row.vigencia_inicio)+' '+row.vigencia_inicio+' '+statusLabel).toLowerCase();
+
+    const html = '<tr>'+
       '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
       '<td>'+fmtMoeda(row.custo)+'</td>'+
       '<td>'+fmtMoeda(row.preco_venda)+'</td>'+
@@ -537,26 +607,27 @@ async function carregarPrecosDoProduto(){
         (podeExcluir ? '<button class="btn-danger" onclick="excluirPreco(\''+row.id+'\')">🗑️</button>' : '')+
       '</td>'+
     '</tr>';
-  }).join('');
+    return { html, searchText };
+  });
 
-  $('precosConteudo').innerHTML =
-    '<div class="card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
-        '<h2 style="margin:0">'+esc(produtoSelecionadoPrecos.nome)+'</h2>'+
-        '<button class="btn" onclick="abrirNovoPreco()">+ Novo Preço</button>'+
-      '</div>'+
-      (precosCache.length ?
-        '<div style="overflow-x:auto"><table><thead><tr><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div>'
-        : '<div class="empty">Nenhum preço cadastrado ainda pra este produto.</div>')+
-    '</div>';
+  const filtradas = filtro ? linhasInfo.filter(l => l.searchText.includes(filtro)) : linhasInfo;
+
+  if(!precosCache.length){ $('historicoConteudo').innerHTML = '<div class="empty">Nenhum preço cadastrado ainda pra este produto.</div>'; return; }
+  if(!filtradas.length){ $('historicoConteudo').innerHTML = '<div class="empty">Nenhum registro encontrado pra essa busca.</div>'; return; }
+
+  $('historicoConteudo').innerHTML =
+    '<div style="overflow-x:auto"><table><thead><tr><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+
+      filtradas.map(l => l.html).join('')+
+    '</tbody></table></div>';
 }
+
 
 async function popularSelectTributosDoElo(elo, selecionadoId){
   const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', elo).order('categoria');
   const sel = $('pcTributo');
   if(error){ sel.innerHTML = '<option value="">— erro ao carregar —</option>'; atualizarMargensModal(); return; }
-  sel.innerHTML = '<option value="" data-aliquota="0">— nenhum —</option>'+
-    (data||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
+  sel.innerHTML = '<option value="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
+    (data||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+')</option>').join('');
   atualizarMargensModal();
 }
 
@@ -615,14 +686,16 @@ async function salvarPreco(){
   btn.disabled = false; btn.textContent = 'Salvar';
   if(error){ showMsg('precoMsg','Erro: '+error.message,'err'); return; }
   fecharModal('modalPreco');
-  carregarPrecosDoProduto();
+  await carregarHistoricoPreco();
+  if(currentTab==='precos') renderPrecos();
 }
 
 async function excluirPreco(id){
   if(!confirm('Excluir este registro de preço? Essa ação é permanente.')) return;
   const { error } = await sb.from('precificacao_precos').delete().eq('id', id);
   if(error){ alert('Erro: '+error.message); return; }
-  carregarPrecosDoProduto();
+  await carregarHistoricoPreco();
+  if(currentTab==='precos') renderPrecos();
 }
 
 verificarAcessoEIniciar();
