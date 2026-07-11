@@ -127,8 +127,9 @@
       <div class="field" style="flex:1">
         <label>Origem</label>
         <select class="inp" id="pdOrigem" onchange="onOrigemProdutoChange()">
-          <option value="fabrica">Fábrica (2 elos: fábrica→loja e loja→consumidor)</option>
-          <option value="revenda">Revenda (1 elo: compra→revenda)</option>
+          <option value="fabrica">Fábrica (3 elos: fábrica→loja, loja→consumidor, loja→delivery)</option>
+          <option value="revenda">Revenda (2 elos: compra→revenda, loja→delivery)</option>
+          <option value="consumo_loja">Feito na loja (2 elos: loja→consumidor, loja→delivery — sem etapa de compra própria)</option>
         </select>
       </div>
     </div>
@@ -223,8 +224,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PORTAL_URL = 'https://thiagodlborges.github.io/Sistema-Luna/';
 const $ = id => document.getElementById(id);
 
-const ELOS_POR_ORIGEM = { fabrica: ['fabrica_loja','loja_consumidor'], revenda: ['compra_revenda'] };
-const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda' };
+const ELOS_POR_ORIGEM = { fabrica: ['fabrica_loja','loja_consumidor','loja_delivery'], revenda: ['compra_revenda','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
+const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda', loja_delivery: 'Loja → Delivery' };
+const ORIGEM_LABEL = { fabrica: 'Fábrica', revenda: 'Revenda', consumo_loja: 'Feito na loja' };
 
 let meuPerfil = null;
 let souMaster = false;
@@ -353,7 +355,7 @@ async function carregarProdutos(){
         '<tr class="'+(p.ativo?'':'inativo')+'">'+
           '<td>'+esc(p.nome)+'</td>'+
           '<td>'+esc(p.categoria)+'</td>'+
-          '<td><span class="badge badge-tipo">'+(p.origem==='fabrica'?'Fábrica':'Revenda')+'</span></td>'+
+          '<td><span class="badge badge-tipo">'+(ORIGEM_LABEL[p.origem]||p.origem)+'</span></td>'+
           '<td>'+(p.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
           '<td style="white-space:nowrap">'+
             '<button class="btn-outline btn btn-sm" onclick="abrirEditarProduto(\''+p.id+'\')">Editar</button> '+
@@ -538,27 +540,29 @@ async function renderPrecos(){
   const el = $('mainContent');
   el.innerHTML = '<div class="loading">Carregando…</div>';
 
-  const [prodR, precoR] = await Promise.all([
-    sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
-    sb.from('precificacao_precos').select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)'),
-  ]);
-  if(prodR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(prodR.error.message)+'</div></div>'; return; }
-  if(precoR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(precoR.error.message)+'</div></div>'; return; }
+  try {
+    const [prodR, precoR] = await Promise.all([
+      sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
+      sb.from('precificacao_precos').select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)'),
+    ]);
+    if(prodR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(prodR.error.message)+'</div></div>'; return; }
+    if(precoR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(precoR.error.message)+'</div></div>'; return; }
 
-  const produtos = prodR.data || [];
-  const todosPrecos = precoR.data || [];
-  window.__produtosAtivosCache = produtos;
+    const produtos = prodR.data || [];
+    const todosPrecos = precoR.data || [];
+    window.__produtosAtivosCache = produtos;
 
-  if(!produtos.length){ el.innerHTML = '<div class="card"><div class="empty">Nenhum produto ativo cadastrado ainda. Cadastre em "Produtos".</div></div>'; return; }
+    if(!produtos.length){ el.innerHTML = '<div class="card"><div class="empty">Nenhum produto ativo cadastrado ainda. Cadastre em "Produtos".</div></div>'; return; }
 
-  const porCategoria = {};
-  produtos.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
-  const categorias = Object.keys(porCategoria).sort();
+    const porCategoria = {};
+    produtos.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
+    const categorias = Object.keys(porCategoria).sort();
 
-  el.innerHTML = categorias.map(cat => {
-    const linhas = porCategoria[cat].map(p => {
-      const elos = ELOS_POR_ORIGEM[p.origem];
-      return elos.map((elo, idx) => {
+    el.innerHTML = categorias.map(cat => {
+      const linhas = porCategoria[cat].map(p => {
+        const elos = ELOS_POR_ORIGEM[p.origem] || [];
+        if(!elos.length) return '<tr><td>'+esc(p.nome)+'</td><td colspan="6" style="color:var(--text-light)">origem "'+esc(p.origem)+'" não reconhecida</td></tr>';
+        return elos.map((elo, idx) => {
         const row = precoVigenteDe(todosPrecos, p.id, elo);
         const aliquotaD = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
         const aliquotaC = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
@@ -574,9 +578,12 @@ async function renderPrecos(){
           '<td style="white-space:nowrap"><button class="btn-outline btn btn-sm" onclick="abrirHistoricoPreco(\''+p.id+'\')">Histórico</button></td>'+
         '</tr>';
       }).join('');
-    }).join('');
+      }).join('');
     return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigente desde</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div></div>';
-  }).join('');
+    }).join('');
+  } catch(err) {
+    el.innerHTML = '<div class="card"><div class="empty">Erro ao carregar: '+esc(err.message||String(err))+'</div></div>';
+  }
 }
 
 async function abrirHistoricoPreco(produtoId){
@@ -674,7 +681,7 @@ function abrirNovoPreco(){
   if(!produtoSelecionadoPrecos) return;
   precoEditandoId = null;
   $('tituloPreco').textContent = 'Novo Preço';
-  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+(produtoSelecionadoPrecos.origem==='fabrica'?'Fábrica':'Revenda');
+  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+(ORIGEM_LABEL[produtoSelecionadoPrecos.origem]||produtoSelecionadoPrecos.origem);
   const elos = ELOS_POR_ORIGEM[produtoSelecionadoPrecos.origem];
   $('pcElo').innerHTML = elos.map(e => '<option value="'+e+'">'+ELO_LABEL[e]+'</option>').join('');
   $('pcElo').disabled = false;
