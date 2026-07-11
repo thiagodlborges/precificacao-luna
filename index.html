@@ -120,6 +120,7 @@
   <div class="tab" id="tabTributos" data-tab="tributos" onclick="mudarTab('tributos')">🧾 Tributos</div>
   <div class="tab" id="tabPrecos" data-tab="precos" onclick="mudarTab('precos')">💲 Preços</div>
   <div class="tab" id="tabCombos" data-tab="combos" onclick="mudarTab('combos')">🎁 Combos</div>
+  <div class="tab" id="tabInsumos" data-tab="insumos" onclick="mudarTab('insumos')">📦 Insumos</div>
   <div class="tab" id="tabAprovacoes" data-tab="aprovacoes" onclick="mudarTab('aprovacoes')">✅ Aprovações<span id="badgePendentes"></span></div>
 </nav>
 
@@ -128,7 +129,7 @@
 
 <!-- MODAL: Novo/editar produto -->
 <div class="modal-overlay" id="modalProduto">
-  <div class="modal">
+  <div class="modal" style="max-width:560px">
     <h3 id="tituloProduto">Novo Produto</h3>
     <div class="field" style="margin-bottom:10px"><label>Nome</label><input class="inp" id="pdNome" placeholder="Ex: Gelato Chocolate, Pote 500ml, Água mineral"></div>
     <div class="row" style="margin-bottom:10px">
@@ -149,9 +150,38 @@
     <label id="pdAtivoWrap" style="display:none;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">
       <input type="checkbox" id="pdAtivo" style="width:16px;height:16px" checked> Produto ativo
     </label>
+
+    <div id="pdInsumosSection" style="display:none;margin-top:16px">
+      <label>Insumos vinculados (embalagem, etc. — soma no custo calculado)</label>
+      <div class="row" style="margin:6px 0 8px">
+        <div class="field" style="flex:2"><label>Insumo</label><select class="inp" id="pdAddInsumo"></select></div>
+        <div class="field" style="width:64px"><label>Qtd</label><input class="inp" id="pdAddInsumoQtd" type="number" min="0.01" step="0.01" value="1"></div>
+        <button class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarInsumoProduto()">+ Add</button>
+      </div>
+      <div id="pdInsumosLista"></div>
+    </div>
+
     <div class="msg" id="produtoMsg"></div>
     <div class="modal-actions"><button class="btn" onclick="salvarProduto()" id="btnSalvarProduto">Salvar</button></div>
     <button class="modal-close" onclick="fecharModal('modalProduto')">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL: Novo/editar insumo -->
+<div class="modal-overlay" id="modalInsumo">
+  <div class="modal">
+    <h3 id="tituloInsumo">Novo Insumo</h3>
+    <div class="field" style="margin-bottom:10px"><label>Nome</label><input class="inp" id="inNome" placeholder="Ex: Cinta para Isopor 1,3L, Pote de Isopor 700ml..."></div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="field" style="flex:1"><label>Custo unitário (R$)</label><input class="inp" id="inCusto" type="number" step="0.01" min="0"></div>
+      <div class="field" style="flex:1"><label>Unidade</label><input class="inp" id="inUnidade" placeholder="un, kg, m..."></div>
+    </div>
+    <label id="inAtivoWrap" style="display:none;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">
+      <input type="checkbox" id="inAtivo" style="width:16px;height:16px" checked> Insumo ativo
+    </label>
+    <div class="msg" id="insumoMsg"></div>
+    <div class="modal-actions"><button class="btn" onclick="salvarInsumo()" id="btnSalvarInsumo">Salvar</button></div>
+    <button class="modal-close" onclick="fecharModal('modalInsumo')">Cancelar</button>
   </div>
 </div>
 
@@ -410,6 +440,7 @@ function renderTab(){
   else if(currentTab==='tributos') renderTributos();
   else if(currentTab==='precos') renderPrecos();
   else if(currentTab==='combos') renderCombos();
+  else if(currentTab==='insumos') renderInsumos();
   else if(currentTab==='aprovacoes') renderAprovacoes();
 }
 
@@ -462,11 +493,12 @@ function abrirNovoProduto(){
   $('tituloProduto').textContent = 'Novo Produto';
   $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='fabrica';
   $('pdAtivoWrap').style.display = 'none';
+  $('pdInsumosSection').style.display = 'none';
   showMsg('produtoMsg','','');
   $('modalProduto').classList.add('show');
 }
 
-function abrirEditarProduto(id){
+async function abrirEditarProduto(id){
   const p = produtosCache.find(x => x.id === id);
   if(!p) return;
   produtoEditandoId = id;
@@ -475,6 +507,9 @@ function abrirEditarProduto(id){
   $('pdAtivoWrap').style.display = 'flex'; $('pdAtivo').checked = !!p.ativo;
   showMsg('produtoMsg','','');
   $('modalProduto').classList.add('show');
+
+  $('pdInsumosSection').style.display = 'block';
+  await carregarInsumosDoProduto(id);
 }
 
 async function salvarProduto(){
@@ -511,6 +546,149 @@ async function excluirProduto(id){
   const { error } = await sb.from('precificacao_produtos').delete().eq('id', id);
   if(error){ alert('Erro: '+error.message+(error.message.includes('foreign key')?' — apague antes os preços desse produto no histórico.':'')); return; }
   renderProdutos();
+}
+
+// ── vínculo de insumos num produto (dentro do modal de produto) ──
+async function carregarInsumosDoProduto(produtoId){
+  const [{ data: vinculados }, { data: todosInsumos }] = await Promise.all([
+    sb.from('precificacao_produto_insumos').select('*, precificacao_insumos(nome, custo_unitario, unidade)').eq('produto_id', produtoId),
+    sb.from('precificacao_insumos').select('*').eq('ativo', true).order('nome'),
+  ]);
+  window.__insumosVinculadosCache = vinculados || [];
+  window.__insumosCatalogoCache = todosInsumos || [];
+  window.__produtoInsumosAtual = produtoId;
+
+  $('pdAddInsumo').innerHTML = (todosInsumos||[]).map(i => '<option value="'+i.id+'">'+esc(i.nome)+' ('+fmtMoeda(i.custo_unitario)+'/'+esc(i.unidade||'un')+')</option>').join('');
+  renderInsumosDoProdutoLista();
+}
+
+function renderInsumosDoProdutoLista(){
+  const vinculados = window.__insumosVinculadosCache || [];
+  if(!vinculados.length){ $('pdInsumosLista').innerHTML = '<p class="hint">Nenhum insumo vinculado.</p>'; return; }
+  let total = 0;
+  const linhas = vinculados.map(v => {
+    const custo = v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
+    total += custo;
+    return '<div class="combo-item-row"><span>'+v.quantidade+'× '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+'</span><button class="rm" onclick="removerInsumoProduto(\''+v.id+'\')">🗑️</button></div>';
+  }).join('');
+  $('pdInsumosLista').innerHTML = linhas + '<p class="hint" style="margin-top:6px">Total de insumos: '+fmtMoeda(total)+' (soma automaticamente no custo calculado)</p>';
+}
+
+async function adicionarInsumoProduto(){
+  const insumoId = $('pdAddInsumo').value;
+  const qtd = Number($('pdAddInsumoQtd').value) || 1;
+  if(!insumoId || !window.__produtoInsumosAtual) return;
+  const { error } = await sb.from('precificacao_produto_insumos').upsert(
+    { produto_id: window.__produtoInsumosAtual, insumo_id: insumoId, quantidade: qtd },
+    { onConflict: 'produto_id,insumo_id' }
+  );
+  if(error){ alert('Erro: '+error.message); return; }
+  await carregarInsumosDoProduto(window.__produtoInsumosAtual);
+}
+
+async function removerInsumoProduto(vinculoId){
+  const { error } = await sb.from('precificacao_produto_insumos').delete().eq('id', vinculoId);
+  if(error){ alert('Erro: '+error.message); return; }
+  await carregarInsumosDoProduto(window.__produtoInsumosAtual);
+}
+
+// ── INSUMOS (catálogo) ─────────────────────────────────────
+let insumoEditandoId = null;
+let insumosCache = [];
+
+async function renderInsumos(){
+  const el = $('mainContent');
+  el.innerHTML =
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+        '<h2 style="margin:0">Insumos</h2>'+
+        '<button class="btn" onclick="abrirNovoInsumo()">+ Novo Insumo</button>'+
+      '</div>'+
+      '<p class="hint">Embalagem e outros itens que compõem o custo de um produto (ex: cinta, pote de isopor). Vincule a um produto editando-o na aba Produtos.</p>'+
+      '<div id="insumosTabela" class="loading">Carregando…</div>'+
+    '</div>';
+  await carregarInsumos();
+}
+
+async function carregarInsumos(){
+  const { data, error } = await sb.from('precificacao_insumos').select('*').order('nome');
+  if(error){ $('insumosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
+  insumosCache = data || [];
+  if(!insumosCache.length){ $('insumosTabela').innerHTML = '<div class="empty">Nenhum insumo cadastrado ainda.</div>'; return; }
+
+  $('insumosTabela').innerHTML =
+    '<table><thead><tr><th>Nome</th><th>Custo unitário</th><th>Unidade</th><th>Status</th><th></th></tr></thead><tbody>'+
+      insumosCache.map(i => (
+        '<tr class="'+(i.ativo?'':'inativo')+'">'+
+          '<td>'+esc(i.nome)+'</td>'+
+          '<td>'+fmtMoeda(i.custo_unitario)+'</td>'+
+          '<td>'+esc(i.unidade||'—')+'</td>'+
+          '<td>'+(i.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
+          '<td style="white-space:nowrap">'+
+            '<button class="btn-outline btn btn-sm" onclick="abrirEditarInsumo(\''+i.id+'\')">Editar</button> '+
+            '<button class="btn-danger" onclick="toggleAtivoInsumo(\''+i.id+'\','+(!i.ativo)+')">'+(i.ativo?'Desativar':'Reativar')+'</button> '+
+            (souMaster ? '<button class="btn-danger" onclick="excluirInsumo(\''+i.id+'\')">🗑️</button>' : '')+
+          '</td>'+
+        '</tr>'
+      )).join('')+
+    '</tbody></table>';
+}
+
+function abrirNovoInsumo(){
+  insumoEditandoId = null;
+  $('tituloInsumo').textContent = 'Novo Insumo';
+  $('inNome').value=''; $('inCusto').value=''; $('inUnidade').value='un';
+  $('inAtivoWrap').style.display = 'none';
+  showMsg('insumoMsg','','');
+  $('modalInsumo').classList.add('show');
+}
+
+function abrirEditarInsumo(id){
+  const i = insumosCache.find(x => x.id === id);
+  if(!i) return;
+  insumoEditandoId = id;
+  $('tituloInsumo').textContent = 'Editar Insumo';
+  $('inNome').value = i.nome; $('inCusto').value = i.custo_unitario; $('inUnidade').value = i.unidade || '';
+  $('inAtivoWrap').style.display = 'flex'; $('inAtivo').checked = !!i.ativo;
+  showMsg('insumoMsg','','');
+  $('modalInsumo').classList.add('show');
+}
+
+async function salvarInsumo(){
+  const nome = $('inNome').value.trim();
+  const custo_unitario = Number($('inCusto').value);
+  const unidade = $('inUnidade').value.trim() || null;
+  if(!nome){ showMsg('insumoMsg','Dá um nome pro insumo.','err'); return; }
+  if(!(custo_unitario>=0)){ showMsg('insumoMsg','Informe um custo válido.','err'); return; }
+
+  const payload = { nome, custo_unitario, unidade, atualizado_em: new Date().toISOString() };
+  if(insumoEditandoId) payload.ativo = $('inAtivo').checked;
+
+  const btn = $('btnSalvarInsumo');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let error;
+  if(insumoEditandoId){
+    ({ error } = await sb.from('precificacao_insumos').update(payload).eq('id', insumoEditandoId));
+  } else {
+    ({ error } = await sb.from('precificacao_insumos').insert({ ...payload, criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome }));
+  }
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(error){ showMsg('insumoMsg','Erro: '+error.message,'err'); return; }
+  fecharModal('modalInsumo');
+  renderInsumos();
+}
+
+async function toggleAtivoInsumo(id, novoValor){
+  const { error } = await sb.from('precificacao_insumos').update({ ativo: novoValor }).eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  renderInsumos();
+}
+
+async function excluirInsumo(id){
+  if(!confirm('Excluir este insumo? Se ele estiver vinculado a algum produto, o vínculo some junto.')) return;
+  const { error } = await sb.from('precificacao_insumos').delete().eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  renderInsumos();
 }
 
 // ── TRIBUTOS ───────────────────────────────────────────────
