@@ -139,9 +139,10 @@
       <div class="field" style="flex:1">
         <label>Origem</label>
         <select class="inp" id="pdOrigem" onchange="onOrigemProdutoChange()">
-          <option value="fabrica">Fábrica (3 elos: fábrica→loja, loja→consumidor, loja→delivery)</option>
-          <option value="revenda">Revenda (2 elos: compra→revenda, loja→delivery)</option>
-          <option value="consumo_loja">Feito na loja (2 elos: loja→consumidor, loja→delivery — sem etapa de compra própria)</option>
+          <option value="fabrica">Fábrica (3 elos: fábrica→loja, loja→consumidor, loja→delivery) — produto acabado que a fábrica vende pra loja</option>
+          <option value="fabrica_insumo">Insumo da fábrica (1 elo: só fábrica→loja) — vendido por peso, nunca direto ao consumidor (ex: sabor de gelato)</option>
+          <option value="revenda">Revenda (2 elos: loja→consumidor, loja→delivery) — comprado pronto de fornecedor externo</option>
+          <option value="consumo_loja">Feito na loja (2 elos: loja→consumidor, loja→delivery) — montado ali, sem compra própria</option>
         </select>
       </div>
     </div>
@@ -165,7 +166,6 @@
           <option value="fabrica_loja">Fábrica → Loja</option>
           <option value="loja_consumidor">Loja → Consumidor</option>
           <option value="loja_delivery">Loja → Delivery</option>
-          <option value="compra_revenda">Compra → Revenda</option>
         </select>
       </div>
       <div class="field" style="flex:1"><label>Categoria</label><input class="inp" id="trCategoria" placeholder="Gelato, Bebida..."></div>
@@ -310,9 +310,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PORTAL_URL = 'https://thiagodlborges.github.io/Sistema-Luna/';
 const $ = id => document.getElementById(id);
 
-const ELOS_POR_ORIGEM = { fabrica: ['fabrica_loja','loja_consumidor','loja_delivery'], revenda: ['compra_revenda','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
+const ELOS_POR_ORIGEM = { fabrica: ['fabrica_loja','loja_consumidor','loja_delivery'], fabrica_insumo: ['fabrica_loja'], revenda: ['loja_consumidor','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
 const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda', loja_delivery: 'Loja → Delivery' };
-const ORIGEM_LABEL = { fabrica: 'Fábrica', revenda: 'Revenda', consumo_loja: 'Feito na loja' };
+const ORIGEM_LABEL = { fabrica: 'Fábrica', fabrica_insumo: 'Insumo (só peso)', revenda: 'Revenda (fornecedor externo)', consumo_loja: 'Feito na loja' };
 
 let meuPerfil = null;
 let souMaster = false;
@@ -425,7 +425,7 @@ async function renderProdutos(){
         '<h2 style="margin:0">Produtos</h2>'+
         '<button class="btn" onclick="abrirNovoProduto()">+ Novo Produto</button>'+
       '</div>'+
-      '<p class="hint">Fábrica tem 3 elos (fábrica→loja, loja→consumidor, loja→delivery). Revenda tem compra→revenda + delivery. Feito na loja (montado ali, sem compra própria) tem loja→consumidor + delivery.</p>'+
+      '<p class="hint">Fábrica: produto acabado (3 elos). Insumo: só vendido por peso, nunca ao consumidor (1 elo). Revenda: comprado pronto de fornecedor (2 elos). Feito na loja: montado ali, sem compra própria (2 elos).</p>'+
       '<div id="produtosTabela" class="loading">Carregando…</div>'+
     '</div>';
   await carregarProdutos();
@@ -622,7 +622,6 @@ const PRECOS_ELO_TABS = [
   { elo: 'fabrica_loja', label: '📦 Fábrica → Loja' },
   { elo: 'loja_consumidor', label: '🛍️ Loja → Consumidor' },
   { elo: 'loja_delivery', label: '🛵 Loja → Delivery' },
-  { elo: 'compra_revenda', label: '🛒 Compra → Revenda' },
 ];
 
 function precoVigenteDe(todosPrecos, produtoId, elo){
