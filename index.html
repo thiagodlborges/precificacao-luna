@@ -1115,10 +1115,44 @@ function calcularAlertaCombo(somaIndividual, precoCombo){
   return { descontoPct, nivel };
 }
 
+function margemHtml(custo, precoVenda){
+  custo = Number(custo)||0; precoVenda = Number(precoVenda)||0;
+  if(precoVenda <= 0) return '—';
+  const margemPct = (precoVenda - custo) / precoVenda * 100;
+  const cor = margemPct < 0 ? 'var(--bordo)' : (margemPct < 30 ? '#b8860b' : 'var(--verde,#2e7d32)');
+  return '<span style="color:'+cor+'">'+fmtPct(margemPct)+'</span>';
+}
+
+function atualizarMargemPrecoLive(id){
+  const custo = Number($('apCusto_'+id).value) || 0;
+  const preco = Number($('apPreco_'+id).value) || 0;
+  $('apMargem_'+id).innerHTML = margemHtml(custo, preco);
+}
+
 function badgeAlertaCombo(nivel, descontoPct){
   if(nivel==='vermelho') return '<span class="alerta-desconto alerta-vermelho">🔴 '+fmtPct(descontoPct)+' abaixo da soma</span>';
   if(nivel==='amarelo') return '<span class="alerta-desconto alerta-amarelo">🟡 '+fmtPct(descontoPct)+' abaixo da soma</span>';
   return fmtPct(descontoPct)+' abaixo da soma';
+}
+
+function atualizarDescontoComboLive(id){
+  const input = $('apComboPreco_'+id);
+  const novoPreco = Number(input.value) || 0;
+  const soma = Number(input.dataset.soma) || 0;
+  const original = Number(input.dataset.original) || 0;
+
+  const alerta = calcularAlertaCombo(soma, novoPreco);
+  $('apComboDesconto_'+id).innerHTML = badgeAlertaCombo(alerta.nivel, alerta.descontoPct);
+
+  const diff = novoPreco - original;
+  const deltaEl = $('apComboDelta_'+id);
+  if(Math.abs(diff) < 0.005){
+    deltaEl.innerHTML = 'igual ao proposto';
+  } else if(diff > 0){
+    deltaEl.innerHTML = '<span style="color:var(--verde,#2e7d32)">▲ '+fmtMoeda(diff)+' a mais que o proposto — mais margem</span>';
+  } else {
+    deltaEl.innerHTML = '<span style="color:var(--bordo)">▼ '+fmtMoeda(Math.abs(diff))+' a menos que o proposto — menos margem</span>';
+  }
 }
 
 function precoVigenteEmLista(lista, produto_id, elo){
@@ -1480,14 +1514,15 @@ async function renderAprovacoes(){
     : '<span class="badge badge-pendente">Aguardando</span>';
 
   const tabelaPrecos = (lista, comAcao) => !lista.length ? '<div class="empty">Nada aqui.</div>' :
-    '<div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>Vigência</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
+    '<div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Margem</th><th>Tributo</th><th>Vigência</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
       lista.map(row => '<tr>'+
         '<td>'+esc(row.precificacao_produtos ? row.precificacao_produtos.nome : '—')+'</td>'+
         '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
         (comAcao && souMaster
-          ? '<td><input class="inp" style="width:90px" id="apCusto_'+row.id+'" type="number" step="0.01" value="'+row.custo+'"></td>'+
-            '<td><input class="inp" style="width:90px" id="apPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_venda+'"></td>'
+          ? '<td><input class="inp" style="width:90px" id="apCusto_'+row.id+'" type="number" step="0.01" value="'+row.custo+'" oninput="atualizarMargemPrecoLive(\''+row.id+'\')"></td>'+
+            '<td><input class="inp" style="width:90px" id="apPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_venda+'" oninput="atualizarMargemPrecoLive(\''+row.id+'\')"></td>'
           : '<td>'+fmtMoeda(row.custo)+'</td><td>'+fmtMoeda(row.preco_venda)+'</td>')+
+        '<td id="apMargem_'+row.id+'">'+margemHtml(row.custo, row.preco_venda)+'</td>'+
         '<td>'+(row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+')' : '—')+'</td>'+
         (comAcao && souMaster
           ? '<td><input class="inp" style="width:130px" id="apVigencia_'+row.id+'" type="date" value="'+row.vigencia_inicio+'"></td>'
@@ -1527,10 +1562,11 @@ async function renderAprovacoes(){
         return '<tr>'+
           '<td>'+esc(row.precificacao_combos ? row.precificacao_combos.nome : '—')+'</td>'+
           (comAcao && souMaster
-            ? '<td><input class="inp" style="width:90px" id="apComboPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_combo+'"></td>'
+            ? '<td><input class="inp" style="width:90px" id="apComboPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_combo+'" data-soma="'+soma+'" data-original="'+row.preco_combo+'" oninput="atualizarDescontoComboLive(\''+row.id+'\')">'+
+              '<div class="hint" id="apComboDelta_'+row.id+'" style="margin-top:2px"></div></td>'
             : '<td>'+fmtMoeda(row.preco_combo)+'</td>')+
           '<td>'+fmtMoeda(soma)+'</td>'+
-          '<td>'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</td>'+
+          '<td id="apComboDesconto_'+row.id+'">'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</td>'+
           (comAcao && souMaster
             ? '<td><input class="inp" style="width:130px" id="apComboVigencia_'+row.id+'" type="date" value="'+row.vigencia_inicio+'"></td>'
             : '<td>'+fmtData(row.vigencia_inicio)+'</td>')+
