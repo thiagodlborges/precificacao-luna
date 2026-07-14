@@ -161,14 +161,8 @@
       <input type="checkbox" id="pdAtivo" style="width:16px;height:16px" checked> Produto ativo
     </label>
 
-    <div class="field" style="margin-top:14px">
-      <label>Peso de gelato incluso na composição (kg) — opcional</label>
-      <input class="inp" id="pdPesoGelato" type="number" min="0" step="0.001" placeholder="Ex: 0.020 (um shot), 0.080 (uma bola)" oninput="atualizarPreviaComposicao()">
-      <p class="hint" style="margin:4px 0 0">Se preenchido, o custo desse peso em gelato entra automaticamente na composição, usando a média ponderada do gelato (pelo volume pedido nos últimos 30 dias).</p>
-    </div>
-
     <div id="pdInsumosSection" style="display:none;margin-top:16px">
-      <label>Insumos vinculados (embalagem, etc. — soma no custo calculado)</label>
+      <label>Composição do custo (insumos, embalagem, gelato etc. — soma automaticamente)</label>
       <div class="row" style="margin:6px 0 8px">
         <div class="field" style="flex:2"><label>Insumo</label><select class="inp" id="pdAddInsumo"></select></div>
         <div class="field" style="width:64px"><label>Qtd</label><input class="inp" id="pdAddInsumoQtd" type="number" min="0.01" step="0.01" value="1"></div>
@@ -434,6 +428,7 @@ async function verificarAcessoEIniciar(){
   document.getElementById('carregandoOverlay').remove();
   renderTab();
   atualizarBadgePendentes();
+  sb.rpc('atualizar_custo_gelato_insumo').then(({error}) => { if(error) console.error('Erro ao atualizar custo do gelato:', error.message); });
 }
 
 async function atualizarBadgePendentes(){
@@ -509,7 +504,7 @@ function onOrigemProdutoChange(){} // reservado — sem dependências hoje
 function abrirNovoProduto(){
   produtoEditandoId = null;
   $('tituloProduto').textContent = 'Novo Produto';
-  $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='fabrica'; $('pdPesoGelato').value='';
+  $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='fabrica';
   $('pdAtivoWrap').style.display = 'none';
   $('pdInsumosSection').style.display = 'none';
   showMsg('produtoMsg','','');
@@ -522,46 +517,31 @@ async function abrirEditarProduto(id){
   produtoEditandoId = id;
   $('tituloProduto').textContent = 'Editar Produto';
   $('pdNome').value = p.nome; $('pdCategoria').value = p.categoria; $('pdOrigem').value = p.origem;
-  $('pdPesoGelato').value = p.peso_kg != null ? p.peso_kg : '';
   $('pdAtivoWrap').style.display = 'flex'; $('pdAtivo').checked = !!p.ativo;
   showMsg('produtoMsg','','');
   $('modalProduto').classList.add('show');
 
   $('pdInsumosSection').style.display = 'block';
-  if(window.__custoGelatoPonderado == null){
-    const { data } = await sb.rpc('custo_medio_ponderado_gelato');
-    window.__custoGelatoPonderado = Number(data) || 0;
-  }
   await carregarInsumosDoProduto(id);
 }
 
 function atualizarPreviaComposicao(){
   const vinculados = window.__insumosVinculadosCache || [];
-  let totalInsumos = 0;
-  vinculados.forEach(v => { totalInsumos += v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0); });
+  let total = 0;
+  vinculados.forEach(v => { total += v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0); });
 
-  const pesoGelato = Number($('pdPesoGelato').value) || 0;
-  const custoKgGelato = window.__custoGelatoPonderado || 0;
-  const custoGelato = pesoGelato * custoKgGelato;
-  const total = totalInsumos + custoGelato;
-
-  const linhas = [];
-  if(vinculados.length) linhas.push('Insumos: '+fmtMoeda(totalInsumos));
-  if(pesoGelato > 0) linhas.push(pesoGelato+'kg de gelato × '+fmtMoeda(custoKgGelato)+'/kg (média ponderada, últimos 30 dias) = '+fmtMoeda(custoGelato));
-
-  $('pdComposicaoResumo').innerHTML = linhas.length
-    ? linhas.join(' · ')+' — <strong>Total da composição: '+fmtMoeda(total)+'</strong> (some isso ao lançar um novo custo)'
-    : 'Nenhum insumo ou peso de gelato vinculado ainda.';
+  $('pdComposicaoResumo').innerHTML = vinculados.length
+    ? '<strong>Total da composição: '+fmtMoeda(total)+'</strong> (some isso ao lançar um novo custo)'
+    : 'Nenhum componente vinculado ainda.';
 }
 
 async function salvarProduto(){
   const nome = $('pdNome').value.trim();
   const categoria = $('pdCategoria').value.trim();
   const origem = $('pdOrigem').value;
-  const pesoGelatoVal = $('pdPesoGelato').value;
   if(!nome || !categoria){ showMsg('produtoMsg','Preencha nome e categoria.','err'); return; }
 
-  const payload = { nome, categoria, origem, peso_kg: pesoGelatoVal !== '' ? Number(pesoGelatoVal) : null };
+  const payload = { nome, categoria, origem };
   if(produtoEditandoId) payload.ativo = $('pdAtivo').checked;
 
   const btn = $('btnSalvarProduto');
@@ -661,14 +641,14 @@ async function carregarInsumos(){
     '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Custo unitário</th><th>Unidade</th><th>Status</th><th></th></tr></thead><tbody>'+
       insumosCache.map(i => (
         '<tr class="'+(i.ativo?'':'inativo')+'">'+
-          '<td>'+esc(i.nome)+'</td>'+
+          '<td>'+esc(i.nome)+(i.automatico?' <span class="badge badge-tipo">🔄 Automático</span>':'')+'</td>'+
           '<td>'+fmtMoeda(i.custo_unitario)+'</td>'+
           '<td>'+esc(i.unidade||'—')+'</td>'+
           '<td>'+(i.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
           '<td style="white-space:nowrap">'+
             '<button class="btn-outline btn btn-sm" onclick="abrirEditarInsumo(\''+i.id+'\')">Editar</button> '+
-            '<button class="btn-danger" onclick="toggleAtivoInsumo(\''+i.id+'\','+(!i.ativo)+')">'+(i.ativo?'Desativar':'Reativar')+'</button> '+
-            (souMaster ? '<button class="btn-danger" onclick="excluirInsumo(\''+i.id+'\')">🗑️</button>' : '')+
+            (i.automatico ? '' : '<button class="btn-danger" onclick="toggleAtivoInsumo(\''+i.id+'\','+(!i.ativo)+')">'+(i.ativo?'Desativar':'Reativar')+'</button> ')+
+            (souMaster && !i.automatico ? '<button class="btn-danger" onclick="excluirInsumo(\''+i.id+'\')">🗑️</button>' : '')+
           '</td>'+
         '</tr>'
       )).join('')+
@@ -679,6 +659,7 @@ function abrirNovoInsumo(){
   insumoEditandoId = null;
   $('tituloInsumo').textContent = 'Novo Insumo';
   $('inNome').value=''; $('inCusto').value=''; $('inUnidade').value='un';
+  $('inNome').disabled = $('inCusto').disabled = $('inUnidade').disabled = false;
   $('inAtivoWrap').style.display = 'none';
   showMsg('insumoMsg','','');
   $('modalInsumo').classList.add('show');
@@ -690,12 +671,22 @@ function abrirEditarInsumo(id){
   insumoEditandoId = id;
   $('tituloInsumo').textContent = 'Editar Insumo';
   $('inNome').value = i.nome; $('inCusto').value = i.custo_unitario; $('inUnidade').value = i.unidade || '';
+  $('inNome').disabled = $('inCusto').disabled = $('inUnidade').disabled = !!i.automatico;
   $('inAtivoWrap').style.display = 'flex'; $('inAtivo').checked = !!i.ativo;
-  showMsg('insumoMsg','','');
+  showMsg('insumoMsg', i.automatico ? 'Esse insumo é atualizado automaticamente pela média ponderada do gelato — não dá pra editar nome, custo ou unidade aqui.' : '', i.automatico ? '' : '');
   $('modalInsumo').classList.add('show');
 }
 
 async function salvarInsumo(){
+  const jaExistente = insumoEditandoId ? insumosCache.find(x => x.id === insumoEditandoId) : null;
+  if(jaExistente && jaExistente.automatico){
+    const { error } = await sb.from('precificacao_insumos').update({ ativo: $('inAtivo').checked }).eq('id', insumoEditandoId);
+    if(error){ showMsg('insumoMsg','Erro: '+error.message,'err'); return; }
+    fecharModal('modalInsumo');
+    renderInsumos();
+    return;
+  }
+
   const nome = $('inNome').value.trim();
   const custo_unitario = Number($('inCusto').value);
   const unidade = $('inUnidade').value.trim() || null;
@@ -726,6 +717,8 @@ async function toggleAtivoInsumo(id, novoValor){
 }
 
 async function excluirInsumo(id){
+  const i = insumosCache.find(x => x.id === id);
+  if(i && i.automatico){ alert('Esse insumo é gerenciado automaticamente e não pode ser excluído.'); return; }
   if(!confirm('Excluir este insumo? Se ele estiver vinculado a algum produto, o vínculo some junto.')) return;
   const { error } = await sb.from('precificacao_insumos').delete().eq('id', id);
   if(error){ alert('Erro: '+error.message); return; }
@@ -1003,19 +996,10 @@ function atualizarTributosDoModalPreco(){
 }
 
 async function calcularCustoComposicao(produtoId){
-  const [{ data: vinculados }, produto] = await Promise.all([
-    sb.from('precificacao_produto_insumos').select('quantidade, precificacao_insumos(custo_unitario)').eq('produto_id', produtoId),
-    Promise.resolve((window.__produtosAtivosCache||[]).find(p => p.id === produtoId)),
-  ]);
+  const { data: vinculados } = await sb.from('precificacao_produto_insumos')
+    .select('quantidade, precificacao_insumos(custo_unitario)').eq('produto_id', produtoId);
   let total = 0;
   (vinculados||[]).forEach(v => { total += v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0); });
-  if(produto && produto.peso_kg){
-    if(window.__custoGelatoPonderado == null){
-      const { data } = await sb.rpc('custo_medio_ponderado_gelato');
-      window.__custoGelatoPonderado = Number(data) || 0;
-    }
-    total += Number(produto.peso_kg) * window.__custoGelatoPonderado;
-  }
   return total;
 }
 
