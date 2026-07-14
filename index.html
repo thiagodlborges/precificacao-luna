@@ -131,6 +131,7 @@
   <div class="tab" id="tabCombos" data-tab="combos" onclick="mudarTab('combos')">🎁 Combos</div>
   <div class="tab" id="tabInsumos" data-tab="insumos" onclick="mudarTab('insumos')">📦 Insumos</div>
   <div class="tab" id="tabAprovacoes" data-tab="aprovacoes" onclick="mudarTab('aprovacoes')">✅ Aprovações<span id="badgePendentes"></span></div>
+  <div class="tab" id="tabRelatorio" data-tab="relatorio" onclick="mudarTab('relatorio')">🧾 Relatório</div>
 </nav>
 
 <main id="mainContent"><div class="loading">Carregando…</div></main>
@@ -160,6 +161,12 @@
       <input type="checkbox" id="pdAtivo" style="width:16px;height:16px" checked> Produto ativo
     </label>
 
+    <div class="field" style="margin-top:14px">
+      <label>Peso de gelato incluso na composição (kg) — opcional</label>
+      <input class="inp" id="pdPesoGelato" type="number" min="0" step="0.001" placeholder="Ex: 0.020 (um shot), 0.080 (uma bola)" oninput="atualizarPreviaComposicao()">
+      <p class="hint" style="margin:4px 0 0">Se preenchido, o custo desse peso em gelato entra automaticamente na composição, usando a média ponderada do gelato (pelo volume pedido nos últimos 30 dias).</p>
+    </div>
+
     <div id="pdInsumosSection" style="display:none;margin-top:16px">
       <label>Insumos vinculados (embalagem, etc. — soma no custo calculado)</label>
       <div class="row" style="margin:6px 0 8px">
@@ -168,6 +175,7 @@
         <button class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarInsumoProduto()">+ Add</button>
       </div>
       <div id="pdInsumosLista"></div>
+      <div id="pdComposicaoResumo" class="hint" style="margin-top:8px"></div>
     </div>
 
     <div class="msg" id="produtoMsg"></div>
@@ -451,6 +459,7 @@ function renderTab(){
   else if(currentTab==='combos') renderCombos();
   else if(currentTab==='insumos') renderInsumos();
   else if(currentTab==='aprovacoes') renderAprovacoes();
+  else if(currentTab==='relatorio') renderRelatorio();
 }
 
 // ── PRODUTOS ───────────────────────────────────────────────
@@ -500,7 +509,7 @@ function onOrigemProdutoChange(){} // reservado — sem dependências hoje
 function abrirNovoProduto(){
   produtoEditandoId = null;
   $('tituloProduto').textContent = 'Novo Produto';
-  $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='fabrica';
+  $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='fabrica'; $('pdPesoGelato').value='';
   $('pdAtivoWrap').style.display = 'none';
   $('pdInsumosSection').style.display = 'none';
   showMsg('produtoMsg','','');
@@ -513,21 +522,46 @@ async function abrirEditarProduto(id){
   produtoEditandoId = id;
   $('tituloProduto').textContent = 'Editar Produto';
   $('pdNome').value = p.nome; $('pdCategoria').value = p.categoria; $('pdOrigem').value = p.origem;
+  $('pdPesoGelato').value = p.peso_kg != null ? p.peso_kg : '';
   $('pdAtivoWrap').style.display = 'flex'; $('pdAtivo').checked = !!p.ativo;
   showMsg('produtoMsg','','');
   $('modalProduto').classList.add('show');
 
   $('pdInsumosSection').style.display = 'block';
+  if(window.__custoGelatoPonderado == null){
+    const { data } = await sb.rpc('custo_medio_ponderado_gelato');
+    window.__custoGelatoPonderado = Number(data) || 0;
+  }
   await carregarInsumosDoProduto(id);
+}
+
+function atualizarPreviaComposicao(){
+  const vinculados = window.__insumosVinculadosCache || [];
+  let totalInsumos = 0;
+  vinculados.forEach(v => { totalInsumos += v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0); });
+
+  const pesoGelato = Number($('pdPesoGelato').value) || 0;
+  const custoKgGelato = window.__custoGelatoPonderado || 0;
+  const custoGelato = pesoGelato * custoKgGelato;
+  const total = totalInsumos + custoGelato;
+
+  const linhas = [];
+  if(vinculados.length) linhas.push('Insumos: '+fmtMoeda(totalInsumos));
+  if(pesoGelato > 0) linhas.push(pesoGelato+'kg de gelato × '+fmtMoeda(custoKgGelato)+'/kg (média ponderada, últimos 30 dias) = '+fmtMoeda(custoGelato));
+
+  $('pdComposicaoResumo').innerHTML = linhas.length
+    ? linhas.join(' · ')+' — <strong>Total da composição: '+fmtMoeda(total)+'</strong> (some isso ao lançar um novo custo)'
+    : 'Nenhum insumo ou peso de gelato vinculado ainda.';
 }
 
 async function salvarProduto(){
   const nome = $('pdNome').value.trim();
   const categoria = $('pdCategoria').value.trim();
   const origem = $('pdOrigem').value;
+  const pesoGelatoVal = $('pdPesoGelato').value;
   if(!nome || !categoria){ showMsg('produtoMsg','Preencha nome e categoria.','err'); return; }
 
-  const payload = { nome, categoria, origem };
+  const payload = { nome, categoria, origem, peso_kg: pesoGelatoVal !== '' ? Number(pesoGelatoVal) : null };
   if(produtoEditandoId) payload.ativo = $('pdAtivo').checked;
 
   const btn = $('btnSalvarProduto');
@@ -573,14 +607,12 @@ async function carregarInsumosDoProduto(produtoId){
 
 function renderInsumosDoProdutoLista(){
   const vinculados = window.__insumosVinculadosCache || [];
-  if(!vinculados.length){ $('pdInsumosLista').innerHTML = '<p class="hint">Nenhum insumo vinculado.</p>'; return; }
-  let total = 0;
-  const linhas = vinculados.map(v => {
-    const custo = v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
-    total += custo;
-    return '<div class="combo-item-row"><span>'+v.quantidade+'× '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+'</span><button class="rm" onclick="removerInsumoProduto(\''+v.id+'\')">🗑️</button></div>';
-  }).join('');
-  $('pdInsumosLista').innerHTML = linhas + '<p class="hint" style="margin-top:6px">Total de insumos: '+fmtMoeda(total)+' (soma automaticamente no custo calculado)</p>';
+  $('pdInsumosLista').innerHTML = !vinculados.length ? '<p class="hint">Nenhum insumo vinculado.</p>' :
+    vinculados.map(v => {
+      const custo = v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
+      return '<div class="combo-item-row"><span>'+v.quantidade+'× '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+'</span><button class="rm" onclick="removerInsumoProduto(\''+v.id+'\')">🗑️</button></div>';
+    }).join('');
+  atualizarPreviaComposicao();
 }
 
 async function adicionarInsumoProduto(){
@@ -842,6 +874,7 @@ async function renderPrecos(){
     const produtos = prodR.data || [];
     const todosPrecos = precoR.data || [];
     window.__produtosAtivosCache = produtos;
+    window.__todosPrecosCache = todosPrecos;
 
     const produtosFiltrados = produtos.filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(precosEloAtual));
 
@@ -864,7 +897,11 @@ async function renderPrecos(){
           (m ? '<td class="mc-cell"><span class="r'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'</span><span class="p">'+fmtPct(m.mcBrutaPct)+'</span></td>' : '<td>—</td>')+
           (m ? '<td class="mc-cell"><span class="r'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'</span><span class="p">'+fmtPct(m.mcLiquidaPct)+'</span></td>' : '<td>—</td>')+
           '<td>'+(row?fmtData(row.vigencia_inicio):'—')+'</td>'+
-          '<td style="white-space:nowrap"><button class="btn-outline btn btn-sm" onclick="abrirHistoricoPreco(\''+p.id+'\')">Histórico</button></td>'+
+          '<td style="white-space:nowrap">'+
+            '<button class="btn-outline btn btn-sm" onclick="abrirNovoValor(\''+p.id+'\',\''+precosEloAtual+'\',\'custo\')">+ Custo</button> '+
+            '<button class="btn-outline btn btn-sm" onclick="abrirNovoValor(\''+p.id+'\',\''+precosEloAtual+'\',\'preco\')">+ Preço</button> '+
+            '<button class="btn-outline btn btn-sm" onclick="abrirHistoricoPreco(\''+p.id+'\')">Histórico</button>'+
+          '</td>'+
         '</tr>';
       }).join('');
       return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço Venda</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigente desde</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div></div>';
@@ -963,6 +1000,50 @@ async function popularSelectTributosDoElo(elo, selecionadoId){
 
 function atualizarTributosDoModalPreco(){
   popularSelectTributosDoElo($('pcElo').value, null);
+}
+
+async function calcularCustoComposicao(produtoId){
+  const [{ data: vinculados }, produto] = await Promise.all([
+    sb.from('precificacao_produto_insumos').select('quantidade, precificacao_insumos(custo_unitario)').eq('produto_id', produtoId),
+    Promise.resolve((window.__produtosAtivosCache||[]).find(p => p.id === produtoId)),
+  ]);
+  let total = 0;
+  (vinculados||[]).forEach(v => { total += v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0); });
+  if(produto && produto.peso_kg){
+    if(window.__custoGelatoPonderado == null){
+      const { data } = await sb.rpc('custo_medio_ponderado_gelato');
+      window.__custoGelatoPonderado = Number(data) || 0;
+    }
+    total += Number(produto.peso_kg) * window.__custoGelatoPonderado;
+  }
+  return total;
+}
+
+async function abrirNovoValor(produtoId, elo, foco){
+  produtoSelecionadoPrecos = (window.__produtosAtivosCache||[]).find(p => p.id === produtoId) || null;
+  if(!produtoSelecionadoPrecos) return;
+  precoEditandoId = null;
+
+  const titulos = { custo:'Novo Custo', preco:'Novo Preço' };
+  $('tituloPreco').textContent = titulos[foco] || 'Novo Preço e Custo';
+  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+ELO_LABEL[elo];
+
+  const elos = ELOS_POR_ORIGEM[produtoSelecionadoPrecos.origem];
+  $('pcElo').innerHTML = elos.map(e => '<option value="'+e+'">'+ELO_LABEL[e]+'</option>').join('');
+  $('pcElo').disabled = false;
+  if(elos.includes(elo)) $('pcElo').value = elo;
+
+  const vigente = precoVigenteDe(window.__todosPrecosCache||[], produtoId, elo);
+  const sugestao = await calcularCustoComposicao(produtoId);
+
+  $('pcCusto').value = vigente ? vigente.custo : (sugestao > 0 ? sugestao.toFixed(2) : '');
+  $('pcPrecoVenda').value = vigente ? vigente.preco_venda : '';
+  $('pcVigencia').value = hojeISO();
+  popularSelectTributosDoElo($('pcElo').value, vigente ? vigente.tributo_aplicado_id : null);
+
+  showMsg('precoMsg', sugestao > 0 ? ('Sugestão pela composição (insumos + gelato): '+fmtMoeda(sugestao)) : '', sugestao > 0 ? '' : '');
+  $('modalPreco').classList.add('show');
+  setTimeout(() => { const campo = foco==='preco' ? $('pcPrecoVenda') : $('pcCusto'); campo.focus(); campo.select(); }, 50);
 }
 
 function abrirNovoPreco(){
@@ -1419,12 +1500,19 @@ async function renderAprovacoes(){
       lista.map(row => '<tr>'+
         '<td>'+esc(row.precificacao_produtos ? row.precificacao_produtos.nome : '—')+'</td>'+
         '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
-        '<td>'+fmtMoeda(row.custo)+'</td>'+
-        '<td>'+fmtMoeda(row.preco_venda)+'</td>'+
+        (comAcao && souMaster
+          ? '<td><input class="inp" style="width:90px" id="apCusto_'+row.id+'" type="number" step="0.01" value="'+row.custo+'"></td>'+
+            '<td><input class="inp" style="width:90px" id="apPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_venda+'"></td>'
+          : '<td>'+fmtMoeda(row.custo)+'</td><td>'+fmtMoeda(row.preco_venda)+'</td>')+
         '<td>'+(row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+')' : '—')+'</td>'+
-        '<td>'+fmtData(row.vigencia_inicio)+'</td>'+
+        (comAcao && souMaster
+          ? '<td><input class="inp" style="width:130px" id="apVigencia_'+row.id+'" type="date" value="'+row.vigencia_inicio+'"></td>'
+          : '<td>'+fmtData(row.vigencia_inicio)+'</td>')+
         '<td>'+esc(row.criado_por_nome||'—')+'</td>'+
-        (comAcao ? '<td style="white-space:nowrap">'+acoes('precificacao_precos', row.id)+'</td>' : '')+
+        (comAcao ? '<td style="white-space:nowrap">'+(souMaster
+          ? '<button class="btn-outline btn btn-sm" onclick="editarEAprovarPreco(\''+row.id+'\',\''+(row.tributo_aplicado_id||'')+'\')">Editar e Aprovar</button> '+
+            '<button class="btn-danger" onclick="aprovarRejeitar(\'precificacao_precos\',\''+row.id+'\',\'rejeitado\')">Rejeitar</button>'
+          : '<span class="badge badge-pendente">Aguardando</span>')+'</td>' : '')+
       '</tr>').join('')+
     '</tbody></table></div>';
 
@@ -1454,12 +1542,19 @@ async function renderAprovacoes(){
         const alerta = calcularAlertaCombo(soma, row.preco_combo);
         return '<tr>'+
           '<td>'+esc(row.precificacao_combos ? row.precificacao_combos.nome : '—')+'</td>'+
-          '<td>'+fmtMoeda(row.preco_combo)+'</td>'+
+          (comAcao && souMaster
+            ? '<td><input class="inp" style="width:90px" id="apComboPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_combo+'"></td>'
+            : '<td>'+fmtMoeda(row.preco_combo)+'</td>')+
           '<td>'+fmtMoeda(soma)+'</td>'+
           '<td>'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</td>'+
-          '<td>'+fmtData(row.vigencia_inicio)+'</td>'+
+          (comAcao && souMaster
+            ? '<td><input class="inp" style="width:130px" id="apComboVigencia_'+row.id+'" type="date" value="'+row.vigencia_inicio+'"></td>'
+            : '<td>'+fmtData(row.vigencia_inicio)+'</td>')+
           '<td>'+esc(row.criado_por_nome||'—')+'</td>'+
-          (comAcao ? '<td style="white-space:nowrap">'+acoes('precificacao_combo_precos', row.id)+'</td>' : '')+
+          (comAcao ? '<td style="white-space:nowrap">'+(souMaster
+            ? '<button class="btn-outline btn btn-sm" onclick="editarEAprovarCombo(\''+row.id+'\',\''+(row.tributo_aplicado_id||'')+'\')">Editar e Aprovar</button> '+
+              '<button class="btn-danger" onclick="aprovarRejeitar(\'precificacao_combo_precos\',\''+row.id+'\',\'rejeitado\')">Rejeitar</button>'
+            : '<span class="badge badge-pendente">Aguardando</span>')+'</td>' : '')+
         '</tr>';
       }).join('')+
     '</tbody></table></div>';
@@ -1489,12 +1584,107 @@ async function renderAprovacoes(){
       '</div>' : '');
 }
 
+async function editarEAprovarPreco(id, tributoAtualId){
+  const custo = Number($('apCusto_'+id).value);
+  const preco_venda = Number($('apPreco_'+id).value);
+  const vigencia_inicio = $('apVigencia_'+id).value;
+  if(!(custo>=0) || !(preco_venda>=0) || !vigencia_inicio){ alert('Preencha custo, preço e vigência válidos.'); return; }
+  const { error } = await sb.rpc('editar_aprovar_preco', {
+    p_id: id, p_custo: custo, p_preco_venda: preco_venda,
+    p_tributo_aplicado_id: tributoAtualId || null, p_vigencia_inicio: vigencia_inicio,
+  });
+  if(error){ alert('Erro: '+error.message); return; }
+  renderAprovacoes();
+  atualizarBadgePendentes();
+}
+
+async function editarEAprovarCombo(id, tributoAtualId){
+  const preco_combo = Number($('apComboPreco_'+id).value);
+  const vigencia_inicio = $('apComboVigencia_'+id).value;
+  if(!(preco_combo>=0) || !vigencia_inicio){ alert('Preencha o preço e a vigência válidos.'); return; }
+  const { error } = await sb.rpc('editar_aprovar_combo_preco', {
+    p_id: id, p_preco_combo: preco_combo,
+    p_tributo_aplicado_id: tributoAtualId || null, p_vigencia_inicio: vigencia_inicio,
+  });
+  if(error){ alert('Erro: '+error.message); return; }
+  renderAprovacoes();
+  atualizarBadgePendentes();
+}
+
 async function aprovarRejeitar(tabela, id, novoStatus){
   if(novoStatus === 'rejeitado' && !confirm('Rejeitar esta proposta? Quem propôs vai poder corrigir e reenviar.')) return;
   const { error } = await sb.from(tabela).update({ status: novoStatus }).eq('id', id);
   if(error){ alert('Erro: '+error.message); return; }
   renderAprovacoes();
   atualizarBadgePendentes();
+}
+
+// ── RELATÓRIO (preços finais por elo — cardápio) ──────────
+let relatorioEloAtual = 'loja_consumidor';
+
+function mudarRelatorioElo(elo){
+  relatorioEloAtual = elo;
+  renderRelatorio();
+}
+
+async function renderRelatorio(){
+  const el = $('mainContent');
+  const subnav = '<div class="subnav">'+PRECOS_ELO_TABS.map(t =>
+    '<div class="subnav-item'+(t.elo===relatorioEloAtual?' active':'')+'" onclick="mudarRelatorioElo(\''+t.elo+'\')">'+t.label+'</div>'
+  ).join('')+'</div>';
+  el.innerHTML = subnav+'<div class="loading">Carregando…</div>';
+
+  const [prodR, precoR] = await Promise.all([
+    sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
+    sb.from('precificacao_precos').select('*').eq('status','aprovado'),
+  ]);
+  if(prodR.error || precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
+
+  const produtos = (prodR.data||[]).filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(relatorioEloAtual));
+  const todosPrecos = precoR.data || [];
+
+  const linhas = produtos.map(p => {
+    const row = precoVigenteDe(todosPrecos, p.id, relatorioEloAtual);
+    return { categoria: p.categoria, nome: p.nome, custo: row?Number(row.custo):null, preco: row?Number(row.preco_venda):null, vigencia: row?row.vigencia_inicio:null };
+  }).filter(l => l.preco != null);
+
+  window.__relatorioLinhasCache = linhas;
+
+  if(!linhas.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum preço aprovado ainda pra esse elo.</div></div>'; return; }
+
+  const porCategoria = {};
+  linhas.forEach(l => { (porCategoria[l.categoria] = porCategoria[l.categoria] || []).push(l); });
+  const categorias = Object.keys(porCategoria).sort();
+
+  el.innerHTML = subnav +
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<h2 style="margin:0">Preços vigentes — '+ELO_LABEL[relatorioEloAtual]+'</h2>'+
+        '<button class="btn-outline btn btn-sm" onclick="exportarRelatorioCSV()">⬇ Exportar CSV/Excel</button>'+
+      '</div>'+
+      '<p class="hint">Pronto pra usar como base do cardápio. Só entram produtos com preço aprovado vigente hoje.</p>'+
+    '</div>'+
+    categorias.map(cat => {
+      const itens = porCategoria[cat].sort((a,b) => a.nome.localeCompare(b.nome));
+      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço</th><th>Vigente desde</th></tr></thead><tbody>'+
+        itens.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.custo!=null?fmtMoeda(l.custo):'—')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+'</td></tr>').join('')+
+      '</tbody></table></div></div>';
+    }).join('');
+}
+
+function exportarRelatorioCSV(){
+  const linhas = window.__relatorioLinhasCache || [];
+  if(!linhas.length) return;
+  const header = 'Categoria;Produto;Custo;Preco;Vigente desde\n';
+  const corpo = linhas.map(l =>
+    [l.categoria, l.nome, l.custo!=null?l.custo.toFixed(2).replace('.',','):'', l.preco.toFixed(2).replace('.',','), l.vigencia||'']
+      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
+  ).join('\n');
+  const blob = new Blob(['\uFEFF'+header+corpo], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'precos-'+relatorioEloAtual+'-'+hojeISO()+'.csv';
+  a.click();
 }
 
 verificarAcessoEIniciar();
