@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Luna — Precificação</title>
+<title>Luna — Precificação (Loja)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -116,7 +116,7 @@
 <div id="appRoot">
 <header>
   <div>
-    <div class="brand">LUNA <span style="font-size:.7em;font-weight:400">Precificação</span></div>
+    <div class="brand">LUNA <span style="font-size:.7em;font-weight:400">Precificação — Loja</span></div>
     <div class="brand-sub">Custo, preço e tributos</div>
   </div>
   <div class="spacer"></div>
@@ -150,8 +150,6 @@
       <div class="field" style="flex:1">
         <label>Origem</label>
         <select class="inp" id="pdOrigem" onchange="onOrigemProdutoChange()">
-          <option value="fabrica">Fábrica (3 elos: fábrica→loja, loja→consumidor, loja→delivery) — produto acabado que a fábrica vende pra loja</option>
-          <option value="fabrica_insumo">Insumo da fábrica (1 elo: só fábrica→loja) — vendido por peso, nunca direto ao consumidor (ex: sabor de gelato)</option>
           <option value="revenda">Revenda (2 elos: loja→consumidor, loja→delivery) — comprado pronto de fornecedor externo</option>
           <option value="consumo_loja">Feito na loja (2 elos: loja→consumidor, loja→delivery) — montado ali, sem compra própria</option>
         </select>
@@ -213,7 +211,6 @@
       <div class="field" style="flex:1">
         <label>Elo</label>
         <select class="inp" id="trElo">
-          <option value="fabrica_loja">Fábrica → Loja</option>
           <option value="loja_consumidor">Loja → Consumidor</option>
           <option value="loja_delivery">Loja → Delivery</option>
         </select>
@@ -372,7 +369,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PORTAL_URL = 'https://thiagodlborges.github.io/Sistema-Luna/';
 const $ = id => document.getElementById(id);
 
-const ELOS_POR_ORIGEM = { fabrica: ['fabrica_loja','loja_consumidor','loja_delivery'], fabrica_insumo: ['fabrica_loja'], revenda: ['loja_consumidor','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
+const ELOS_POR_ORIGEM = { revenda: ['loja_consumidor','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
 const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda', loja_delivery: 'Loja → Delivery' };
 const ORIGEM_LABEL = { fabrica: 'Fábrica', fabrica_insumo: 'Insumo (só peso)', revenda: 'Revenda (fornecedor externo)', consumo_loja: 'Feito na loja' };
 
@@ -440,7 +437,7 @@ async function verificarAcessoEIniciar(){
   if (error || !perfil) { window.location.href = PORTAL_URL; return; }
 
   souMaster = perfil.tipo === 'master';
-  const souBackoffice = souMaster || perfil.precificacao_backoffice === true;
+  const souBackoffice = souMaster || perfil.precificacao_loja_backoffice === true;
   if (!souBackoffice) { await sb.auth.signOut(); window.location.href = PORTAL_URL; return; }
   souBackofficePrecificacao = souBackoffice;
 
@@ -497,7 +494,7 @@ async function renderProdutos(){
 }
 
 async function carregarProdutos(){
-  const { data, error } = await sb.from('precificacao_produtos').select('*').order('nome');
+  const { data, error } = await sb.from('precificacao_produtos').select('*').in('origem', ['revenda','consumo_loja']).order('nome');
   if(error){ $('produtosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
   produtosCache = data || [];
   if(!produtosCache.length){ $('produtosTabela').innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'; return; }
@@ -790,7 +787,7 @@ async function salvarInsumo(){
   if(insumoEditandoId){
     ({ error } = await sb.from('precificacao_insumos').update(payload).eq('id', insumoEditandoId));
   } else {
-    ({ error } = await sb.from('precificacao_insumos').insert({ ...payload, criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome }));
+    ({ error } = await sb.from('precificacao_insumos').insert({ ...payload, empresa: 'loja', criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome }));
   }
   btn.disabled = false; btn.textContent = 'Salvar';
   if(error){ showMsg('insumoMsg','Erro: '+error.message,'err'); return; }
@@ -916,10 +913,9 @@ async function excluirTributo(id){
 let precoEditandoId = null;
 let produtoSelecionadoPrecos = null;
 let precosCache = [];
-let precosEloAtual = 'fabrica_loja';
+let precosEloAtual = 'loja_consumidor';
 
 const PRECOS_ELO_TABS = [
-  { elo: 'fabrica_loja', label: '📦 Fábrica → Loja' },
   { elo: 'loja_consumidor', label: '🛍️ Loja → Consumidor' },
   { elo: 'loja_delivery', label: '🛵 Loja → Delivery' },
 ];
