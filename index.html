@@ -145,7 +145,8 @@
     <div class="row" style="margin-bottom:10px">
       <div class="field" style="flex:1">
         <label>Categoria</label>
-        <input class="inp" id="pdCategoria" placeholder="Gelato, Pote, Picolé, Bebida...">
+        <input class="inp" id="pdCategoria" list="categoriasDatalist" placeholder="Escolha uma existente ou digite uma nova...">
+        <datalist id="categoriasDatalist"></datalist>
       </div>
       <div class="field" style="flex:1">
         <label>Origem</label>
@@ -257,10 +258,13 @@
       <label>Elo</label>
       <select class="inp" id="pcElo" onchange="atualizarTributosDoModalPreco()"></select>
     </div>
-    <div class="row" style="margin-bottom:10px">
+    <div class="row" style="margin-bottom:4px">
       <div class="field" style="flex:1"><label>Custo (R$)</label><input class="inp" id="pcCusto" type="number" step="0.01" min="0" oninput="atualizarMargensModal()"></div>
       <div class="field" style="flex:1"><label>Preço de venda (R$)</label><input class="inp" id="pcPrecoVenda" type="number" step="0.01" min="0" oninput="atualizarMargensModal()"></div>
     </div>
+    <label id="pcCustoCreditoWrap" style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;margin-bottom:10px;font-size:.8rem;color:var(--text-light)">
+      <input type="checkbox" id="pcCustoTomaCredito" checked style="width:16px;height:16px" onchange="atualizarMargensModal()"> Esse custo (sem detalhar por item) toma crédito de imposto
+    </label>
     <details id="pcComposicaoDetails" style="margin-bottom:10px">
       <summary style="cursor:pointer;font-size:.8rem;color:var(--bordo);font-weight:600">🧮 Compor o custo a partir de insumos/gelato (grão, embalagem, gelato...)</summary>
       <div style="margin-top:10px;padding:12px;background:var(--creme,#faf6f0);border-radius:8px">
@@ -274,8 +278,8 @@
       </div>
     </details>
     <div class="field" style="margin-bottom:10px">
-      <label>Tributo aplicado (opcional)</label>
-      <select class="inp" id="pcTributo" onchange="atualizarMargensModal()"><option value="">— nenhum —</option></select>
+      <label>Impostos aplicados (marque quantos incidirem — nada de "blend")</label>
+      <div id="pcTributosLista" style="display:flex;flex-direction:column;gap:6px;padding:10px;border:1.5px solid var(--creme-dark);border-radius:8px"></div>
     </div>
     <div class="margem-box">
       <h4>Margem de contribuição (calculada, não é salva — sempre reflete os campos acima)</h4>
@@ -385,13 +389,14 @@ function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFract
 
 // MC Bruta é sobre o faturamento bruto (preço de venda); MC Líquida é sobre a receita líquida de impostos.
 // Impostos líquidos = débito (aliquota % sobre preço de venda) − crédito (aliquota_credito % sobre custo, ex: PIS/Cofins não-cumulativo).
-function calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito){
+function calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito, baseCredito){
   custo = Number(custo)||0;
   precoVenda = Number(precoVenda)||0;
   aliquotaDebito = Number(aliquotaDebito)||0;
   aliquotaCredito = Number(aliquotaCredito)||0;
+  baseCredito = baseCredito == null ? custo : Number(baseCredito)||0;
   const debito = precoVenda * (aliquotaDebito/100);
-  const credito = custo * (aliquotaCredito/100);
+  const credito = baseCredito * (aliquotaCredito/100);
   const impostos = debito - credito;
   const receitaLiquida = precoVenda - impostos;
   const mcBrutaR = precoVenda - custo;
@@ -401,19 +406,31 @@ function calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito){
   return { debito, credito, impostos, receitaLiquida, mcBrutaR, mcBrutaPct, mcLiquidaR, mcLiquidaPct };
 }
 
+function baseCreditoAtual(){
+  const vinculados = window.__pcInsumosVinculados || [];
+  if(vinculados.length){
+    return vinculados.reduce((soma, v) => {
+      if(!v.toma_credito) return soma;
+      return soma + v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
+    }, 0);
+  }
+  const custo = Number($('pcCusto').value) || 0;
+  return $('pcCustoTomaCredito').checked ? custo : 0;
+}
+
 function atualizarMargensModal(){
   const grid = $('pcMargensGrid');
   if(!grid) return;
   const custo = $('pcCusto').value;
   const precoVenda = $('pcPrecoVenda').value;
-  const tributoSel = $('pcTributo');
-  const opt = tributoSel ? tributoSel.options[tributoSel.selectedIndex] : null;
-  const aliquotaDebito = opt ? Number(opt.dataset.aliquota || 0) : 0;
-  const aliquotaCredito = opt ? Number(opt.dataset.aliquotaCredito || 0) : 0;
-  const m = calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito);
-  const impostosLbl = aliquotaCredito > 0
-    ? 'Impostos líq. (déb. '+fmtPct(aliquotaDebito)+' venda − créd. '+fmtPct(aliquotaCredito)+' compra)'
-    : 'Impostos ('+fmtPct(aliquotaDebito)+')';
+  const checks = [...document.querySelectorAll('.pc-tributo-check:checked')];
+  const aliquotaDebito = checks.reduce((s,c) => s + Number(c.dataset.aliquota||0), 0);
+  const aliquotaCredito = checks.reduce((s,c) => s + Number(c.dataset.aliquotaCredito||0), 0);
+  const baseCredito = baseCreditoAtual();
+  const m = calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito, baseCredito);
+  const impostosLbl = checks.length
+    ? (checks.length===1 ? checks[0].parentElement.textContent.split('—')[0].trim() : checks.length+' impostos')+' — déb. '+fmtPct(aliquotaDebito)+(aliquotaCredito>0?' / créd. '+fmtPct(aliquotaCredito):'')
+    : 'Impostos (nenhum selecionado)';
   grid.innerHTML =
     '<div class="margem-item"><div class="lbl">'+impostosLbl+'</div><div class="val">'+fmtMoeda(m.impostos)+'</div></div>'+
     '<div class="margem-item"><div class="lbl">Receita Líquida</div><div class="val">'+fmtMoeda(m.receitaLiquida)+'</div></div>'+
@@ -493,10 +510,16 @@ async function renderProdutos(){
   await carregarProdutos();
 }
 
+function atualizarCategoriasDatalist(){
+  const categorias = [...new Set((produtosCache||[]).map(p => p.categoria).filter(Boolean))].sort();
+  $('categoriasDatalist').innerHTML = categorias.map(c => '<option value="'+esc(c)+'">').join('');
+}
+
 async function carregarProdutos(){
   const { data, error } = await sb.from('precificacao_produtos').select('*').in('origem', ['revenda','consumo_loja']).order('nome');
   if(error){ $('produtosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
   produtosCache = data || [];
+  atualizarCategoriasDatalist();
   if(!produtosCache.length){ $('produtosTabela').innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'; return; }
 
   $('produtosTabela').innerHTML =
@@ -608,9 +631,15 @@ function renderInsumosDoProdutoLista(){
   $('pdInsumosLista').innerHTML = !vinculados.length ? '<p class="hint">Nenhum insumo vinculado.</p>' :
     vinculados.map(v => {
       const custo = v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
-      return '<div class="combo-item-row"><span>'+v.quantidade+'× '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+'</span><button class="rm" onclick="removerInsumoProduto(\''+v.id+'\')">🗑️</button></div>';
+      return '<div class="combo-item-row"><label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;flex:1"><input type="checkbox" style="width:15px;height:15px" '+(v.toma_credito?'checked':'')+' onchange="toggleCreditoInsumoProduto(\''+v.id+'\', this.checked)"><span>'+v.quantidade+'× '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+' <span style="color:var(--text-light);font-size:.72rem">(toma crédito)</span></span></label><button class="rm" onclick="removerInsumoProduto(\''+v.id+'\')">🗑️</button></div>';
     }).join('');
   atualizarPreviaComposicao();
+}
+
+async function toggleCreditoInsumoProduto(vinculoId, valor){
+  const { error } = await sb.from('precificacao_produto_insumos').update({ toma_credito: valor }).eq('id', vinculoId);
+  if(error){ alert('Erro: '+error.message); return; }
+  await carregarInsumosDoProduto(window.__produtoInsumosAtual);
 }
 
 async function adicionarInsumoProduto(){
@@ -651,12 +680,19 @@ function renderInsumosNoPrecoLista(){
     vinculados.map(v => {
       const custo = v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
       total += custo;
-      return '<div class="combo-item-row"><span>'+v.quantidade+' '+esc(v.precificacao_insumos?v.precificacao_insumos.unidade:'')+' de '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+'</span><button class="rm" onclick="removerInsumoNoPreco(\''+v.id+'\')">🗑️</button></div>';
+      return '<div class="combo-item-row"><label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;flex:1"><input type="checkbox" style="width:15px;height:15px" '+(v.toma_credito?'checked':'')+' onchange="toggleCreditoInsumoNoPreco(\''+v.id+'\', this.checked)"><span>'+v.quantidade+' '+esc(v.precificacao_insumos?v.precificacao_insumos.unidade:'')+' de '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+' <span style="color:var(--text-light);font-size:.72rem">(toma crédito)</span></span></label><button class="rm" onclick="removerInsumoNoPreco(\''+v.id+'\')">🗑️</button></div>';
     }).join('');
 
   $('pcComposicaoResumo').innerHTML = vinculados.length
     ? '<strong>Total da composição: '+fmtMoeda(total)+'</strong> &nbsp;<button type="button" class="btn-outline btn btn-sm" onclick="usarComposicaoComoCusto('+total+')">Usar este valor no Custo</button>'
     : '';
+  atualizarMargensModal();
+}
+
+async function toggleCreditoInsumoNoPreco(vinculoId, valor){
+  const { error } = await sb.from('precificacao_produto_insumos').update({ toma_credito: valor }).eq('id', vinculoId);
+  if(error){ alert('Erro: '+error.message); return; }
+  await carregarInsumosNoPreco(window.__pcProdutoAtual);
 }
 
 async function adicionarInsumoNoPreco(){
@@ -1064,19 +1100,24 @@ function renderHistoricoTabela(){
 }
 
 
-async function popularSelectTributosDoElo(elo, selecionadoId){
-  let query = sb.from('precificacao_tributos').select('*').eq('elo', elo);
-  const { data, error } = await query;
-  const sel = $('pcTributo');
-  if(error){ sel.innerHTML = '<option value="">— erro ao carregar —</option>'; atualizarMargensModal(); return; }
-  const lista = (data||[]).filter(t => t.status === 'aprovado' || t.id === selecionadoId).sort((a,b) => a.categoria.localeCompare(b.categoria));
-  sel.innerHTML = '<option value="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
-    lista.map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(t.id===selecionadoId?' selected':'')+'>'+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+(t.status!=='aprovado'?' — '+t.status:'')+')</option>').join('');
+async function popularTributosCheckboxDoElo(elo, selecionadosIds){
+  selecionadosIds = selecionadosIds || [];
+  const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', elo);
+  const wrap = $('pcTributosLista');
+  if(error){ wrap.innerHTML = '<p class="hint">Erro ao carregar impostos.</p>'; atualizarMargensModal(); return; }
+  const lista = (data||[]).filter(t => t.status === 'aprovado' || selecionadosIds.includes(t.id)).sort((a,b) => a.categoria.localeCompare(b.categoria));
+  wrap.innerHTML = !lista.length ? '<p class="hint">Nenhum imposto cadastrado pra esse elo ainda.</p>' :
+    lista.map(t => (
+      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;font-size:.85rem">'+
+        '<input type="checkbox" class="pc-tributo-check" value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(selecionadosIds.includes(t.id)?' checked':'')+' onchange="atualizarMargensModal()" style="width:16px;height:16px">'+
+        esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+(t.status!=='aprovado'?' — '+t.status:'')+')'+
+      '</label>'
+    )).join('');
   atualizarMargensModal();
 }
 
 function atualizarTributosDoModalPreco(){
-  popularSelectTributosDoElo($('pcElo').value, null);
+  popularTributosCheckboxDoElo($('pcElo').value, []);
 }
 
 async function calcularCustoComposicao(produtoId){
@@ -1107,7 +1148,9 @@ async function abrirNovoValor(produtoId, elo, foco){
   $('pcCusto').value = vigente ? vigente.custo : (sugestao > 0 ? sugestao.toFixed(2) : '');
   $('pcPrecoVenda').value = vigente ? vigente.preco_venda : '';
   $('pcVigencia').value = hojeISO();
-  popularSelectTributosDoElo($('pcElo').value, vigente ? vigente.tributo_aplicado_id : null);
+  $('pcCustoTomaCredito').checked = vigente ? (vigente.custo_toma_credito !== false) : true;
+  const tributosSelecionados = vigente ? (await sb.from('precificacao_preco_tributos').select('tributo_id').eq('preco_id', vigente.id)).data || [] : [];
+  await popularTributosCheckboxDoElo($('pcElo').value, tributosSelecionados.map(t => t.tributo_id));
 
   showMsg('precoMsg', sugestao > 0 ? ('Sugestão pela composição (veja abaixo): '+fmtMoeda(sugestao)) : '', '');
   await carregarInsumosNoPreco(produtoId);
@@ -1125,13 +1168,14 @@ function abrirNovoPreco(){
   $('pcElo').disabled = false;
   if(elos.includes(precosEloAtual)) $('pcElo').value = precosEloAtual;
   $('pcCusto').value=''; $('pcPrecoVenda').value=''; $('pcVigencia').value=hojeISO();
-  popularSelectTributosDoElo($('pcElo').value, null);
+  $('pcCustoTomaCredito').checked = true;
+  popularTributosCheckboxDoElo($('pcElo').value, []);
   showMsg('precoMsg','','');
   carregarInsumosNoPreco(produtoSelecionadoPrecos.id);
   $('modalPreco').classList.add('show');
 }
 
-function abrirEditarPreco(id){
+async function abrirEditarPreco(id){
   const row = precosCache.find(x => x.id === id);
   if(!row) return;
   precoEditandoId = id;
@@ -1140,7 +1184,9 @@ function abrirEditarPreco(id){
   $('pcElo').innerHTML = '<option value="'+row.elo+'">'+ELO_LABEL[row.elo]+'</option>';
   $('pcElo').disabled = true;
   $('pcCusto').value = row.custo; $('pcPrecoVenda').value = row.preco_venda; $('pcVigencia').value = row.vigencia_inicio;
-  popularSelectTributosDoElo(row.elo, row.tributo_aplicado_id);
+  $('pcCustoTomaCredito').checked = row.custo_toma_credito !== false;
+  const { data: tribRow } = await sb.from('precificacao_preco_tributos').select('tributo_id').eq('preco_id', row.id);
+  await popularTributosCheckboxDoElo(row.elo, (tribRow||[]).map(t => t.tributo_id));
   showMsg('precoMsg','','');
   carregarInsumosNoPreco(produtoSelecionadoPrecos.id);
   $('modalPreco').classList.add('show');
@@ -1150,34 +1196,48 @@ async function salvarPreco(){
   const elo = $('pcElo').value;
   const custo = Number($('pcCusto').value);
   const preco_venda = Number($('pcPrecoVenda').value);
-  const tributo_aplicado_id = $('pcTributo').value || null;
+  const custo_toma_credito = $('pcCustoTomaCredito').checked;
+  const tributosSelecionados = [...document.querySelectorAll('.pc-tributo-check:checked')].map(c => c.value);
+  const tributo_aplicado_id = tributosSelecionados[0] || null;
   const vigencia_inicio = $('pcVigencia').value;
   if(!vigencia_inicio){ showMsg('precoMsg','Informe a vigência.','err'); return; }
   if(custo < 0 || preco_venda < 0){ showMsg('precoMsg','Custo e preço de venda precisam ser válidos.','err'); return; }
 
   const btn = $('btnSalvarPreco');
   btn.disabled = true; btn.textContent = 'Salvando…';
-  let error;
+  let error, precoId;
   if(precoEditandoId){
-    ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, tributo_aplicado_id, vigencia_inicio }).eq('id', precoEditandoId));
+    ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, custo_toma_credito, tributo_aplicado_id, vigencia_inicio }).eq('id', precoEditandoId));
+    precoId = precoEditandoId;
   } else {
     const { data: existente } = await sb.from('precificacao_precos').select('id, status')
       .eq('produto_id', produtoSelecionadoPrecos.id).eq('elo', elo).eq('vigencia_inicio', vigencia_inicio).maybeSingle();
 
     if(existente && existente.status === 'pendente'){
-      ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, tributo_aplicado_id }).eq('id', existente.id));
+      ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, custo_toma_credito, tributo_aplicado_id }).eq('id', existente.id));
+      precoId = existente.id;
     } else if(existente){
       btn.disabled = false; btn.textContent = 'Salvar';
       showMsg('precoMsg','Já existe um preço com essa vigência (status: '+existente.status+'). Escolha outra data, ou ajuste esse registro pela aba Aprovações/Histórico.','err');
       return;
     } else {
-      ({ error } = await sb.from('precificacao_precos').insert({
-        produto_id: produtoSelecionadoPrecos.id, elo, custo, preco_venda, tributo_aplicado_id, vigencia_inicio,
+      const { data: novo, error: errIns } = await sb.from('precificacao_precos').insert({
+        produto_id: produtoSelecionadoPrecos.id, elo, custo, preco_venda, custo_toma_credito, tributo_aplicado_id, vigencia_inicio,
         criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
-      }));
+      }).select('id').single();
+      error = errIns; precoId = novo ? novo.id : null;
     }
   }
+
+  if(!error && precoId){
+    await sb.from('precificacao_preco_tributos').delete().eq('preco_id', precoId);
+    if(tributosSelecionados.length){
+      await sb.from('precificacao_preco_tributos').insert(tributosSelecionados.map(tid => ({ preco_id: precoId, tributo_id: tid })));
+    }
+  }
+
   btn.disabled = false; btn.textContent = 'Salvar';
+  if(error && error.code === '23505'){ showMsg('precoMsg','Já existe um preço com essa vigência pra esse produto/elo. Escolha outra data, ou dá um refresh na página (Ctrl+Shift+R) — pode ser cache de uma versão antiga.','err'); return; }
   if(error){ showMsg('precoMsg','Erro: '+error.message,'err'); return; }
   fecharModal('modalPreco');
   await carregarHistoricoPreco();
@@ -1585,6 +1645,7 @@ async function salvarPrecoCombo(){
     }));
   }
   btn.disabled = false; btn.textContent = 'Salvar';
+  if(error && error.code === '23505'){ showMsg('precoComboMsg','Já existe um preço com essa vigência pra esse combo. Escolha outra data, ou dá um refresh na página (Ctrl+Shift+R) — pode ser cache de uma versão antiga.','err'); return; }
   if(error){ showMsg('precoComboMsg','Erro: '+error.message,'err'); return; }
   fecharModal('modalPrecoCombo');
   await carregarHistoricoCombo();
