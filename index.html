@@ -128,7 +128,7 @@
   <div class="tab active" id="tabProdutos" data-tab="produtos" onclick="mudarTab('produtos')">📦 Produtos</div>
   <div class="tab" id="tabTributos" data-tab="tributos" onclick="mudarTab('tributos')">🧾 Tributos</div>
   <div class="tab" id="tabPrecos" data-tab="precos" onclick="mudarTab('precos')">💲 Preços</div>
-  <div class="tab" id="tabCombos" data-tab="combos" onclick="mudarTab('combos')">🎁 Combos</div>
+  <div class="tab" id="tabCombos" data-tab="combos" onclick="mudarTab('combos')">🎁 Combos e Promoções</div>
   <div class="tab" id="tabInsumos" data-tab="insumos" onclick="mudarTab('insumos')">📦 Insumos</div>
   <div class="tab" id="tabAprovacoes" data-tab="aprovacoes" onclick="mudarTab('aprovacoes')">✅ Aprovações<span id="badgePendentes"></span></div>
   <div class="tab" id="tabRelatorio" data-tab="relatorio" onclick="mudarTab('relatorio')">🧾 Relatório</div>
@@ -145,8 +145,9 @@
     <div class="row" style="margin-bottom:10px">
       <div class="field" style="flex:1">
         <label>Categoria</label>
-        <input class="inp" id="pdCategoria" list="categoriasDatalist" placeholder="Escolha uma existente ou digite uma nova...">
+        <input class="inp" id="pdCategoria" list="categoriasDatalist" placeholder="Clique na seta ou digite">
         <datalist id="categoriasDatalist"></datalist>
+        <p class="hint" style="margin-top:4px">Não existe uma tela separada de categorias — é aqui mesmo. Clique no campo pra ver as que já existem, ou simplesmente digite um nome novo (ex: "Salgados") que ele já cria essa categoria ao salvar o produto.</p>
       </div>
       <div class="field" style="flex:1">
         <label>Origem</label>
@@ -295,10 +296,18 @@
 <!-- MODAL: Novo combo (item + preço inicial) -->
 <div class="modal-overlay" id="modalCombo">
   <div class="modal" style="max-width:600px">
-    <h3>Novo Combo</h3>
-    <div class="field" style="margin-bottom:10px"><label>Nome do combo</label><input class="inp" id="cbNome" placeholder="Ex: Combo Casal, Combo Verão..."></div>
+    <h3 id="tituloCombo">Novo Combo</h3>
+    <div class="row" style="margin-bottom:10px">
+      <div class="field" style="flex:1"><label>Tipo</label>
+        <select class="inp" id="cbTipo" onchange="onTipoComboChange()">
+          <option value="combo">Combo (tempo indeterminado)</option>
+          <option value="promocao">Promoção (tempo limitado)</option>
+        </select>
+      </div>
+      <div class="field" style="flex:2"><label>Nome</label><input class="inp" id="cbNome" placeholder="Ex: Combo Casal, Promoção Dia das Mães..."></div>
+    </div>
 
-    <label>Itens do combo</label>
+    <label>Itens</label>
     <div class="row" style="margin:6px 0 8px">
       <div class="field" style="flex:2"><label>Produto</label><select class="inp" id="cbAddProduto" onchange="onProdutoComboChange()"></select></div>
       <div class="field" style="flex:1"><label>Elo</label><select class="inp" id="cbAddElo"></select></div>
@@ -306,10 +315,12 @@
       <button class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarItemCombo()">+ Add</button>
     </div>
     <div id="cbItensLista" style="margin-bottom:14px"></div>
+    <p class="hint" id="cbItensMinHint" style="margin:-8px 0 14px"></p>
 
     <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1"><label>Preço do combo (R$)</label><input class="inp" id="cbPreco" type="number" step="0.01" min="0" oninput="atualizarResumoCombo()"></div>
+      <div class="field" style="flex:1"><label>Preço (R$)</label><input class="inp" id="cbPreco" type="number" step="0.01" min="0" oninput="atualizarResumoCombo()"></div>
       <div class="field" style="flex:1"><label>Vigência a partir de</label><input class="inp" id="cbVigencia" type="date"></div>
+      <div class="field" id="cbVigenciaFimWrap" style="flex:1;display:none"><label>Vigência até</label><input class="inp" id="cbVigenciaFim" type="date"></div>
     </div>
     <div class="field" style="margin-bottom:10px">
       <label>Tributo aplicado (opcional)</label>
@@ -350,6 +361,7 @@
     <div class="row" style="margin-bottom:10px">
       <div class="field" style="flex:1"><label>Preço do combo (R$)</label><input class="inp" id="pcComboPreco" type="number" step="0.01" min="0" oninput="atualizarResumoPrecoCombo()"></div>
       <div class="field" style="flex:1"><label>Vigência a partir de</label><input class="inp" id="pcComboVigencia" type="date"></div>
+      <div class="field" id="pcComboVigenciaFimWrap" style="flex:1;display:none"><label>Vigência até</label><input class="inp" id="pcComboVigenciaFim" type="date"></div>
     </div>
     <div class="field" style="margin-bottom:10px">
       <label>Tributo aplicado (opcional)</label>
@@ -373,7 +385,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PORTAL_URL = 'https://thiagodlborges.github.io/Sistema-Luna/';
 const $ = id => document.getElementById(id);
 
-const ELOS_POR_ORIGEM = { revenda: ['loja_consumidor','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
+const ELOS_POR_ORIGEM = { fabrica: ['loja_consumidor','loja_delivery'], revenda: ['loja_consumidor','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
 const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda', loja_delivery: 'Loja → Delivery' };
 const ORIGEM_LABEL = { fabrica: 'Fábrica', fabrica_insumo: 'Insumo (só peso)', revenda: 'Revenda (fornecedor externo)', consumo_loja: 'Feito na loja' };
 
@@ -1338,14 +1350,19 @@ async function renderCombos(){
   const itemPrecos = itemPrecosR.data || [];
   const hoje = hojeISO();
 
-  const header = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn" onclick="abrirNovoCombo()">+ Novo Combo</button></div>';
+  const header = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn" onclick="abrirNovoCombo()">+ Novo Combo/Promoção</button></div>';
 
-  if(!combosCache.length){ el.innerHTML = header+'<div class="card"><div class="empty">Nenhum combo cadastrado ainda.</div></div>'; return; }
+  if(!combosCache.length){ el.innerHTML = header+'<div class="card"><div class="empty">Nenhum combo ou promoção cadastrado ainda.</div></div>'; return; }
 
-  const cards = combosCache.map(combo => {
+  const cardDe = (combo) => {
     const meusItens = itens.filter(i => i.combo_id === combo.id);
-    const meusPrecos = precos.filter(p => p.combo_id === combo.id && p.vigencia_inicio <= hoje).sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
+    const meusPrecos = precos.filter(p => p.combo_id === combo.id && p.vigencia_inicio <= hoje && (!p.vigencia_fim || p.vigencia_fim >= hoje))
+      .sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
     const precoVigente = meusPrecos[0] || null;
+
+    // detecta se existe um preço aprovado que já passou da validade (promoção expirada)
+    const todosPrecosDoCombo = precos.filter(p => p.combo_id === combo.id).sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
+    const ultimoExpirado = !precoVigente && todosPrecosDoCombo.find(p => p.vigencia_fim && p.vigencia_fim < hoje);
 
     let somaIndividual = 0, custoTotal = 0;
     meusItens.forEach(i => {
@@ -1363,9 +1380,15 @@ async function renderCombos(){
       alerta = calcularAlertaCombo(somaIndividual, precoVigente.preco_combo);
     }
 
+    const badgeVigencia = combo.tipo === 'promocao'
+      ? (precoVigente
+          ? (precoVigente.vigencia_fim ? '<span class="badge badge-tipo">válida até '+fmtData(precoVigente.vigencia_fim)+'</span>' : '<span class="badge badge-tipo">sem data de fim</span>')
+          : (ultimoExpirado ? '<span class="badge" style="background:#f0dede;color:#B43C3C">expirada em '+fmtData(ultimoExpirado.vigencia_fim)+'</span>' : ''))
+      : '';
+
     return '<div class="card">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'+
-        '<h2 style="margin:0">'+esc(combo.nome)+'</h2>'+
+        '<h2 style="margin:0">'+esc(combo.nome)+' '+badgeVigencia+'</h2>'+
         '<div style="white-space:nowrap">'+
           '<button class="btn-outline btn btn-sm" onclick="abrirHistoricoCombo(\''+combo.id+'\')">Histórico</button> '+
           (souMaster ? '<button class="btn-danger" onclick="excluirCombo(\''+combo.id+'\')">🗑️</button>' : '')+
@@ -1374,23 +1397,42 @@ async function renderCombos(){
       '<div style="margin-bottom:12px">'+(itensTxt||'<span class="hint">sem itens</span>')+'</div>'+
       (precoVigente ?
         '<div class="row" style="margin-bottom:0;gap:26px">'+
-          '<div class="margem-item"><div class="lbl">Preço do combo</div><div class="val">'+fmtMoeda(precoVigente.preco_combo)+'</div></div>'+
+          '<div class="margem-item"><div class="lbl">Preço</div><div class="val">'+fmtMoeda(precoVigente.preco_combo)+'</div></div>'+
           '<div class="margem-item"><div class="lbl">Soma individual</div><div class="val">'+fmtMoeda(somaIndividual)+'</div></div>'+
           (mc ? '<div class="margem-item"><div class="lbl">MC Líquida</div><div class="val'+(mc.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(mc.mcLiquidaR)+'<span class="pct">'+fmtPct(mc.mcLiquidaPct)+'</span></div></div>' : '')+
           '<div class="margem-item"><div class="lbl">Desconto</div><div style="margin-top:2px">'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</div></div>'+
         '</div>'
-        : '<div class="empty" style="padding:14px">Sem preço cadastrado ainda</div>')+
+        : '<div class="empty" style="padding:14px">Sem preço vigente'+(ultimoExpirado?' (a promoção anterior expirou)':'')+'</div>')+
     '</div>';
-  }).join('');
+  };
 
-  el.innerHTML = header + cards;
+  const combosDe = combosCache.filter(c => c.tipo !== 'promocao');
+  const promosDe = combosCache.filter(c => c.tipo === 'promocao');
+
+  el.innerHTML = header +
+    '<h2 style="margin:0 0 8px">🎁 Combos</h2>' +
+    (combosDe.length ? combosDe.map(cardDe).join('') : '<div class="card"><div class="empty">Nenhum combo ainda.</div></div>') +
+    '<h2 style="margin:24px 0 8px">🏷️ Promoções</h2>' +
+    (promosDe.length ? promosDe.map(cardDe).join('') : '<div class="card"><div class="empty">Nenhuma promoção ainda.</div></div>');
+}
+
+function onTipoComboChange(){
+  const tipo = $('cbTipo').value;
+  $('cbVigenciaFimWrap').style.display = tipo === 'promocao' ? '' : 'none';
+  $('cbItensMinHint').textContent = tipo === 'promocao'
+    ? 'Promoção pode ter só 1 item, ou vários.'
+    : 'Combo precisa de pelo menos 2 itens.';
 }
 
 async function abrirNovoCombo(){
   comboItensAtual = [];
+  $('tituloCombo').textContent = 'Novo Combo/Promoção';
+  $('cbTipo').value = 'combo';
   $('cbNome').value = '';
   $('cbPreco').value = '';
   $('cbVigencia').value = hojeISO();
+  $('cbVigenciaFim').value = '';
+  onTipoComboChange();
   showMsg('comboMsg','','');
 
   const [{ data: produtos }, { data: precos }, { data: tributos }] = await Promise.all([
@@ -1442,7 +1484,7 @@ function renderComboItensLista(){
     '<div class="combo-item-row"><span>'+it.quantidade+'× '+esc(it.nome)+' ('+ELO_LABEL[it.elo]+')'+
       (it.semPreco ? ' — <span style="color:#B43C3C">sem preço vigente</span>' : ' — '+fmtMoeda(it.preco_venda)+' cada')+
     '</span><button class="rm" onclick="removerItemCombo('+idx+')">🗑️</button></div>'
-  ).join('') : '<p class="hint">Nenhum item adicionado ainda — precisa de pelo menos 2.</p>';
+  ).join('') : '<p class="hint">Nenhum item adicionado ainda.</p>';
 }
 
 function atualizarResumoCombo(){
@@ -1466,18 +1508,23 @@ function atualizarResumoCombo(){
 
 async function salvarNovoCombo(){
   const nome = $('cbNome').value.trim();
+  const tipo = $('cbTipo').value;
   const preco_combo = Number($('cbPreco').value);
   const vigencia_inicio = $('cbVigencia').value;
+  const vigencia_fim = tipo === 'promocao' ? ($('cbVigenciaFim').value || null) : null;
   const tributo_aplicado_id = $('cbTributo').value || null;
-  if(!nome){ showMsg('comboMsg','Dá um nome pro combo.','err'); return; }
-  if(comboItensAtual.length < 2){ showMsg('comboMsg','Um combo precisa de pelo menos 2 itens.','err'); return; }
+  if(!nome){ showMsg('comboMsg','Dá um nome.','err'); return; }
+  const minimo = tipo === 'promocao' ? 1 : 2;
+  if(comboItensAtual.length < minimo){ showMsg('comboMsg', tipo==='promocao' ? 'Uma promoção precisa de pelo menos 1 item.' : 'Um combo precisa de pelo menos 2 itens.', 'err'); return; }
   if(!vigencia_inicio || !(preco_combo>=0)){ showMsg('comboMsg','Preencha vigência e um preço válido.','err'); return; }
+  if(tipo === 'promocao' && !vigencia_fim){ showMsg('comboMsg','Promoção precisa de uma data de fim.','err'); return; }
+  if(vigencia_fim && vigencia_fim < vigencia_inicio){ showMsg('comboMsg','A vigência até não pode ser antes da vigência a partir de.','err'); return; }
 
   const btn = $('btnSalvarCombo');
   btn.disabled = true; btn.textContent = 'Salvando…';
 
   const { data: combo, error: e1 } = await sb.from('precificacao_combos')
-    .insert({ nome, criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome }).select().single();
+    .insert({ nome, tipo, criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome }).select().single();
   if(e1){ btn.disabled=false; btn.textContent='Salvar'; showMsg('comboMsg','Erro: '+e1.message,'err'); return; }
 
   const itensPayload = comboItensAtual.map(it => ({ combo_id: combo.id, produto_id: it.produto_id, elo: it.elo, quantidade: it.quantidade }));
@@ -1485,7 +1532,7 @@ async function salvarNovoCombo(){
   if(e2){ btn.disabled=false; btn.textContent='Salvar'; showMsg('comboMsg','Erro nos itens: '+e2.message,'err'); return; }
 
   const { error: e3 } = await sb.from('precificacao_combo_precos').insert({
-    combo_id: combo.id, preco_combo, tributo_aplicado_id, vigencia_inicio,
+    combo_id: combo.id, preco_combo, tributo_aplicado_id, vigencia_inicio, vigencia_fim,
     criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
   });
   btn.disabled = false; btn.textContent = 'Salvar';
@@ -1550,8 +1597,9 @@ async function renderHistoricoComboTabela(){
     let status, statusLabel;
     if(row.status==='pendente'){ status='pendente'; statusLabel='Pendente aprovação'; }
     else if(row.status==='rejeitado'){ status='rejeitado'; statusLabel='Rejeitado'; }
+    else if(row.vigencia_fim && row.vigencia_fim < hoje){ status='historico'; statusLabel='Expirada em '+fmtData(row.vigencia_fim); }
     else {
-      const aprovados = comboPrecosCache.filter(r=>r.status==='aprovado' && r.vigencia_inicio<=hoje).sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
+      const aprovados = comboPrecosCache.filter(r=>r.status==='aprovado' && r.vigencia_inicio<=hoje && (!r.vigencia_fim || r.vigencia_fim>=hoje)).sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
       const atual = aprovados[0];
       if(row.vigencia_inicio > hoje){ status='agendado'; statusLabel='Agendado'; }
       else if(atual && atual.id===row.id){ status='vigente'; statusLabel='Vigente'; }
@@ -1568,7 +1616,7 @@ async function renderHistoricoComboTabela(){
       '<td>'+fmtMoeda(soma)+'</td>'+
       '<td>'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</td>'+
       '<td class="mc-cell"><span class="r'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'</span><span class="p">'+fmtPct(m.mcLiquidaPct)+'</span></td>'+
-      '<td>'+fmtData(row.vigencia_inicio)+'</td>'+
+      '<td>'+fmtData(row.vigencia_inicio)+(row.vigencia_fim?' até '+fmtData(row.vigencia_fim):'')+'</td>'+
       '<td><span class="badge badge-'+status+'">'+statusLabel+'</span></td>'+
       '<td style="white-space:nowrap">'+(podeExcluir ? '<button class="btn-danger" onclick="excluirPrecoCombo(\''+row.id+'\')">🗑️</button>' : '')+'</td>'+
     '</tr>';
@@ -1591,6 +1639,8 @@ async function abrirNovoPrecoCombo(){
   $('pcComboNome').textContent = comboSelecionado.nome;
   $('pcComboPreco').value = '';
   $('pcComboVigencia').value = hojeISO();
+  $('pcComboVigenciaFim').value = '';
+  $('pcComboVigenciaFimWrap').style.display = comboSelecionado.tipo === 'promocao' ? '' : 'none';
   showMsg('precoComboMsg','','');
 
   const { data: tributos } = await sb.from('precificacao_tributos').select('*').eq('status','aprovado').order('elo').order('categoria');
@@ -1622,9 +1672,12 @@ async function atualizarResumoPrecoCombo(){
 async function salvarPrecoCombo(){
   const preco_combo = Number($('pcComboPreco').value);
   const vigencia_inicio = $('pcComboVigencia').value;
+  const vigencia_fim = comboSelecionado.tipo === 'promocao' ? ($('pcComboVigenciaFim').value || null) : null;
   const tributo_aplicado_id = $('pcComboTributo').value || null;
   if(!vigencia_inicio){ showMsg('precoComboMsg','Informe a vigência.','err'); return; }
   if(!(preco_combo>=0)){ showMsg('precoComboMsg','Informe um preço válido.','err'); return; }
+  if(comboSelecionado.tipo === 'promocao' && !vigencia_fim){ showMsg('precoComboMsg','Promoção precisa de uma data de fim.','err'); return; }
+  if(vigencia_fim && vigencia_fim < vigencia_inicio){ showMsg('precoComboMsg','A vigência até não pode ser antes da vigência a partir de.','err'); return; }
 
   const btn = $('btnSalvarPrecoCombo');
   btn.disabled = true; btn.textContent = 'Salvando…';
@@ -1633,14 +1686,14 @@ async function salvarPrecoCombo(){
     .eq('combo_id', comboSelecionado.id).eq('vigencia_inicio', vigencia_inicio).maybeSingle();
 
   if(existente && existente.status === 'pendente'){
-    ({ error } = await sb.from('precificacao_combo_precos').update({ preco_combo, tributo_aplicado_id }).eq('id', existente.id));
+    ({ error } = await sb.from('precificacao_combo_precos').update({ preco_combo, tributo_aplicado_id, vigencia_fim }).eq('id', existente.id));
   } else if(existente){
     btn.disabled = false; btn.textContent = 'Salvar';
     showMsg('precoComboMsg','Já existe um preço com essa vigência (status: '+existente.status+'). Escolha outra data, ou ajuste esse registro pela aba Aprovações/Histórico.','err');
     return;
   } else {
     ({ error } = await sb.from('precificacao_combo_precos').insert({
-      combo_id: comboSelecionado.id, preco_combo, tributo_aplicado_id, vigencia_inicio,
+      combo_id: comboSelecionado.id, preco_combo, tributo_aplicado_id, vigencia_inicio, vigencia_fim,
       criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
     }));
   }
@@ -1661,7 +1714,7 @@ async function renderAprovacoes(){
   const [precosR, tributosR, combosR, comboItensR, itemPrecosR] = await Promise.all([
     sb.from('precificacao_precos').select('*, precificacao_produtos(nome), precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
     sb.from('precificacao_tributos').select('*').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
-    sb.from('precificacao_combo_precos').select('*, precificacao_combos(nome), precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
+    sb.from('precificacao_combo_precos').select('*, precificacao_combos(nome, tipo), precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
     sb.from('precificacao_combo_itens').select('*'),
     sb.from('precificacao_precos').select('*').eq('status','aprovado'),
   ]);
@@ -1721,7 +1774,7 @@ async function renderAprovacoes(){
     '</tbody></table></div>';
 
   const tabelaCombos = (lista, comAcao) => !lista.length ? '<div class="empty">Nada aqui.</div>' :
-    '<div style="overflow-x:auto"><table><thead><tr><th>Combo</th><th>Preço</th><th>Soma Individual</th><th>Desconto</th><th>Vigência</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
+    '<div style="overflow-x:auto"><table><thead><tr><th>Combo</th><th>Preço</th><th>Soma Individual</th><th>Desconto</th><th>Vigência</th><th>Até (promoção)</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
       lista.map(row => {
         const meusItens = comboItens.filter(i => i.combo_id === row.combo_id);
         let soma = 0;
@@ -1730,8 +1783,9 @@ async function renderAprovacoes(){
           if(pv) soma += Number(pv.preco_venda) * i.quantidade;
         });
         const alerta = calcularAlertaCombo(soma, row.preco_combo);
+        const ehPromocao = row.precificacao_combos && row.precificacao_combos.tipo === 'promocao';
         return '<tr>'+
-          '<td>'+esc(row.precificacao_combos ? row.precificacao_combos.nome : '—')+'</td>'+
+          '<td>'+esc(row.precificacao_combos ? row.precificacao_combos.nome : '—')+(ehPromocao?' <span class="badge badge-tipo">promoção</span>':'')+'</td>'+
           (comAcao && souMaster
             ? '<td><input class="inp" style="width:90px" id="apComboPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_combo+'" data-soma="'+soma+'" data-original="'+row.preco_combo+'" oninput="atualizarDescontoComboLive(\''+row.id+'\')">'+
               '<div class="hint" id="apComboDelta_'+row.id+'" style="margin-top:2px"></div></td>'
@@ -1741,6 +1795,9 @@ async function renderAprovacoes(){
           (comAcao && souMaster
             ? '<td><input class="inp" style="width:130px" id="apComboVigencia_'+row.id+'" type="date" value="'+row.vigencia_inicio+'"></td>'
             : '<td>'+fmtData(row.vigencia_inicio)+'</td>')+
+          (comAcao && souMaster
+            ? '<td>'+(ehPromocao ? '<input class="inp" style="width:130px" id="apComboVigenciaFim_'+row.id+'" type="date" value="'+(row.vigencia_fim||'')+'">' : '—')+'</td>'
+            : '<td>'+(row.vigencia_fim ? fmtData(row.vigencia_fim) : '—')+'</td>')+
           '<td>'+esc(row.criado_por_nome||'—')+'</td>'+
           (comAcao ? '<td style="white-space:nowrap">'+(souMaster
             ? '<button class="btn-outline btn btn-sm" onclick="editarEAprovarCombo(\''+row.id+'\',\''+(row.tributo_aplicado_id||'')+'\')">Editar e Aprovar</button> '+
@@ -1792,10 +1849,13 @@ async function editarEAprovarPreco(id, tributoAtualId){
 async function editarEAprovarCombo(id, tributoAtualId){
   const preco_combo = Number($('apComboPreco_'+id).value);
   const vigencia_inicio = $('apComboVigencia_'+id).value;
+  const campoFim = $('apComboVigenciaFim_'+id);
+  const vigencia_fim = campoFim ? (campoFim.value || null) : null;
   if(!(preco_combo>=0) || !vigencia_inicio){ alert('Preencha o preço e a vigência válidos.'); return; }
+  if(campoFim && !vigencia_fim){ alert('Essa é uma promoção — preencha a vigência até.'); return; }
   const { error } = await sb.rpc('editar_aprovar_combo_preco', {
     p_id: id, p_preco_combo: preco_combo,
-    p_tributo_aplicado_id: tributoAtualId || null, p_vigencia_inicio: vigencia_inicio,
+    p_tributo_aplicado_id: tributoAtualId || null, p_vigencia_inicio: vigencia_inicio, p_vigencia_fim: vigencia_fim,
   });
   if(error){ alert('Erro: '+error.message); return; }
   renderAprovacoes();
@@ -1825,9 +1885,11 @@ async function renderRelatorio(){
   ).join('')+'</div>';
   el.innerHTML = subnav+'<div class="loading">Carregando…</div>';
 
-  const [prodR, precoR] = await Promise.all([
+  const [prodR, precoR, combosR, comboPrecosR] = await Promise.all([
     sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
     sb.from('precificacao_precos').select('*').eq('status','aprovado'),
+    sb.from('precificacao_combos').select('*').eq('ativo', true),
+    sb.from('precificacao_combo_precos').select('*').eq('status','aprovado'),
   ]);
   if(prodR.error || precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
 
@@ -1841,11 +1903,28 @@ async function renderRelatorio(){
 
   window.__relatorioLinhasCache = linhas;
 
-  if(!linhas.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum preço aprovado ainda pra esse elo.</div></div>'; return; }
+  // Combos e promoções vigentes hoje (independem do elo escolhido — são bundle pro consumidor)
+  const hoje = hojeISO();
+  const combos = combosR.data || [];
+  const comboPrecos = comboPrecosR.data || [];
+  const linhasCombo = combos.map(c => {
+    const vigentes = comboPrecos.filter(p => p.combo_id === c.id && p.vigencia_inicio <= hoje && (!p.vigencia_fim || p.vigencia_fim >= hoje))
+      .sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
+    const row = vigentes[0];
+    if(!row) return null;
+    return { tipo: c.tipo, nome: c.nome, preco: Number(row.preco_combo), vigencia: row.vigencia_inicio, vigenciaFim: row.vigencia_fim };
+  }).filter(Boolean);
+  window.__relatorioComboCache = linhasCombo;
+
+  if(!linhas.length && !linhasCombo.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum preço aprovado ainda pra esse elo.</div></div>'; return; }
 
   const porCategoria = {};
   linhas.forEach(l => { (porCategoria[l.categoria] = porCategoria[l.categoria] || []).push(l); });
   const categorias = Object.keys(porCategoria).sort();
+
+  const comboSecao = linhasCombo.length ? '<div class="card"><h2>🎁 Combos e Promoções</h2><div style="overflow-x:auto"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Preço</th><th>Vigência</th></tr></thead><tbody>'+
+    linhasCombo.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.tipo==='promocao'?'Promoção':'Combo')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+(l.vigenciaFim?' até '+fmtData(l.vigenciaFim):'')+'</td></tr>').join('')+
+  '</tbody></table></div></div>' : '';
 
   el.innerHTML = subnav +
     '<div class="card">'+
@@ -1853,24 +1932,31 @@ async function renderRelatorio(){
         '<h2 style="margin:0">Preços vigentes — '+ELO_LABEL[relatorioEloAtual]+'</h2>'+
         '<button class="btn-outline btn btn-sm" onclick="exportarRelatorioCSV()">⬇ Exportar CSV/Excel</button>'+
       '</div>'+
-      '<p class="hint">Pronto pra usar como base do cardápio. Só entram produtos com preço aprovado vigente hoje.</p>'+
+      '<p class="hint">Pronto pra usar como base do cardápio. Só entram produtos (e combos/promoções) com preço aprovado vigente hoje.</p>'+
     '</div>'+
     categorias.map(cat => {
       const itens = porCategoria[cat].sort((a,b) => a.nome.localeCompare(b.nome));
       return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço</th><th>Vigente desde</th></tr></thead><tbody>'+
         itens.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.custo!=null?fmtMoeda(l.custo):'—')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+'</td></tr>').join('')+
       '</tbody></table></div></div>';
-    }).join('');
+    }).join('') +
+    comboSecao;
 }
 
 function exportarRelatorioCSV(){
   const linhas = window.__relatorioLinhasCache || [];
-  if(!linhas.length) return;
-  const header = 'Categoria;Produto;Custo;Preco;Vigente desde\n';
-  const corpo = linhas.map(l =>
-    [l.categoria, l.nome, l.custo!=null?l.custo.toFixed(2).replace('.',','):'', l.preco.toFixed(2).replace('.',','), l.vigencia||'']
+  const linhasCombo = window.__relatorioComboCache || [];
+  if(!linhas.length && !linhasCombo.length) return;
+  const header = 'Categoria/Tipo;Produto;Custo;Preco;Vigente desde;Vigente ate\n';
+  const corpoProdutos = linhas.map(l =>
+    [l.categoria, l.nome, l.custo!=null?l.custo.toFixed(2).replace('.',','):'', l.preco.toFixed(2).replace('.',','), l.vigencia||'', '']
       .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
   ).join('\n');
+  const corpoCombos = linhasCombo.map(l =>
+    [l.tipo==='promocao'?'Promoção':'Combo', l.nome, '', l.preco.toFixed(2).replace('.',','), l.vigencia||'', l.vigenciaFim||'']
+      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
+  ).join('\n');
+  const corpo = [corpoProdutos, corpoCombos].filter(Boolean).join('\n');
   const blob = new Blob(['\uFEFF'+header+corpo], { type:'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
