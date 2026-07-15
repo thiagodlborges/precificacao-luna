@@ -1165,10 +1165,21 @@ async function salvarPreco(){
   if(precoEditandoId){
     ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, tributo_aplicado_id, vigencia_inicio }).eq('id', precoEditandoId));
   } else {
-    ({ error } = await sb.from('precificacao_precos').insert({
-      produto_id: produtoSelecionadoPrecos.id, elo, custo, preco_venda, tributo_aplicado_id, vigencia_inicio,
-      criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
-    }));
+    const { data: existente } = await sb.from('precificacao_precos').select('id, status')
+      .eq('produto_id', produtoSelecionadoPrecos.id).eq('elo', elo).eq('vigencia_inicio', vigencia_inicio).maybeSingle();
+
+    if(existente && existente.status === 'pendente'){
+      ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, tributo_aplicado_id }).eq('id', existente.id));
+    } else if(existente){
+      btn.disabled = false; btn.textContent = 'Salvar';
+      showMsg('precoMsg','Já existe um preço com essa vigência (status: '+existente.status+'). Escolha outra data, ou ajuste esse registro pela aba Aprovações/Histórico.','err');
+      return;
+    } else {
+      ({ error } = await sb.from('precificacao_precos').insert({
+        produto_id: produtoSelecionadoPrecos.id, elo, custo, preco_venda, tributo_aplicado_id, vigencia_inicio,
+        criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
+      }));
+    }
   }
   btn.disabled = false; btn.textContent = 'Salvar';
   if(error){ showMsg('precoMsg','Erro: '+error.message,'err'); return; }
@@ -1561,10 +1572,22 @@ async function salvarPrecoCombo(){
 
   const btn = $('btnSalvarPrecoCombo');
   btn.disabled = true; btn.textContent = 'Salvando…';
-  const { error } = await sb.from('precificacao_combo_precos').insert({
-    combo_id: comboSelecionado.id, preco_combo, tributo_aplicado_id, vigencia_inicio,
-    criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
-  });
+  let error;
+  const { data: existente } = await sb.from('precificacao_combo_precos').select('id, status')
+    .eq('combo_id', comboSelecionado.id).eq('vigencia_inicio', vigencia_inicio).maybeSingle();
+
+  if(existente && existente.status === 'pendente'){
+    ({ error } = await sb.from('precificacao_combo_precos').update({ preco_combo, tributo_aplicado_id }).eq('id', existente.id));
+  } else if(existente){
+    btn.disabled = false; btn.textContent = 'Salvar';
+    showMsg('precoComboMsg','Já existe um preço com essa vigência (status: '+existente.status+'). Escolha outra data, ou ajuste esse registro pela aba Aprovações/Histórico.','err');
+    return;
+  } else {
+    ({ error } = await sb.from('precificacao_combo_precos').insert({
+      combo_id: comboSelecionado.id, preco_combo, tributo_aplicado_id, vigencia_inicio,
+      criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
+    }));
+  }
   btn.disabled = false; btn.textContent = 'Salvar';
   if(error){ showMsg('precoComboMsg','Erro: '+error.message,'err'); return; }
   fecharModal('modalPrecoCombo');
