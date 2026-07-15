@@ -1885,11 +1885,12 @@ async function renderRelatorio(){
   ).join('')+'</div>';
   el.innerHTML = subnav+'<div class="loading">Carregando…</div>';
 
-  const [prodR, precoR, combosR, comboPrecosR] = await Promise.all([
+  const [prodR, precoR, combosR, comboPrecosR, comboItensR] = await Promise.all([
     sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
     sb.from('precificacao_precos').select('*').eq('status','aprovado'),
     sb.from('precificacao_combos').select('*').eq('ativo', true),
     sb.from('precificacao_combo_precos').select('*').eq('status','aprovado'),
+    sb.from('precificacao_combo_itens').select('*, precificacao_produtos(nome)'),
   ]);
   if(prodR.error || precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
 
@@ -1903,17 +1904,28 @@ async function renderRelatorio(){
 
   window.__relatorioLinhasCache = linhas;
 
-  // Combos e promoções vigentes hoje (independem do elo escolhido — são bundle pro consumidor)
+  // Combos e promoções: mostra TODOS os períodos de preço (vigente, agendado, expirado),
+  // sinalizando o status de cada um, com os itens que compõem cada combo.
   const hoje = hojeISO();
   const combos = combosR.data || [];
   const comboPrecos = comboPrecosR.data || [];
-  const linhasCombo = combos.map(c => {
-    const vigentes = comboPrecos.filter(p => p.combo_id === c.id && p.vigencia_inicio <= hoje && (!p.vigencia_fim || p.vigencia_fim >= hoje))
-      .sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
-    const row = vigentes[0];
-    if(!row) return null;
-    return { tipo: c.tipo, nome: c.nome, preco: Number(row.preco_combo), vigencia: row.vigencia_inicio, vigenciaFim: row.vigencia_fim };
-  }).filter(Boolean);
+  const comboItens = comboItensR.data || [];
+
+  const linhasCombo = [];
+  combos.forEach(c => {
+    const meusItens = comboItens.filter(i => i.combo_id === c.id);
+    const itensTxt = meusItens.map(i => i.quantidade+'× '+esc(i.precificacao_produtos?i.precificacao_produtos.nome:'?')).join(', ');
+    const precosDoCombo = comboPrecos.filter(p => p.combo_id === c.id).sort((a,b)=>a.vigencia_inicio.localeCompare(b.vigencia_inicio));
+    precosDoCombo.forEach(p => {
+      let status, statusLabel;
+      if(p.vigencia_inicio > hoje){ status='agendado'; statusLabel='Agendado a partir de '+fmtData(p.vigencia_inicio); }
+      else if(p.vigencia_fim && p.vigencia_fim < hoje){ status='expirado'; statusLabel='Expirado em '+fmtData(p.vigencia_fim); }
+      else { status='vigente'; statusLabel='Vigente agora'; }
+      linhasCombo.push({ tipo: c.tipo, nome: c.nome, itensTxt, preco: Number(p.preco_combo), vigencia: p.vigencia_inicio, vigenciaFim: p.vigencia_fim, status, statusLabel });
+    });
+  });
+  const ordemStatus = { vigente:0, agendado:1, expirado:2 };
+  linhasCombo.sort((a,b) => (ordemStatus[a.status]-ordemStatus[b.status]) || b.vigencia.localeCompare(a.vigencia));
   window.__relatorioComboCache = linhasCombo;
 
   if(!linhas.length && !linhasCombo.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum preço aprovado ainda pra esse elo.</div></div>'; return; }
@@ -1922,8 +1934,9 @@ async function renderRelatorio(){
   linhas.forEach(l => { (porCategoria[l.categoria] = porCategoria[l.categoria] || []).push(l); });
   const categorias = Object.keys(porCategoria).sort();
 
-  const comboSecao = linhasCombo.length ? '<div class="card"><h2>🎁 Combos e Promoções</h2><div style="overflow-x:auto"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Preço</th><th>Vigência</th></tr></thead><tbody>'+
-    linhasCombo.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.tipo==='promocao'?'Promoção':'Combo')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+(l.vigenciaFim?' até '+fmtData(l.vigenciaFim):'')+'</td></tr>').join('')+
+  const corStatus = { vigente:'var(--verde,#2e7d32)', agendado:'#b8860b', expirado:'var(--text-light)' };
+  const comboSecao = linhasCombo.length ? '<div class="card"><h2>🎁 Combos e Promoções</h2><div style="overflow-x:auto"><table><thead><tr><th>Nome</th><th>Itens</th><th>Tipo</th><th>Preço</th><th>Vigência</th><th>Status</th></tr></thead><tbody>'+
+    linhasCombo.map(l => '<tr><td>'+esc(l.nome)+'</td><td style="font-size:.78rem;color:var(--text-light)">'+(l.itensTxt||'—')+'</td><td>'+(l.tipo==='promocao'?'Promoção':'Combo')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+(l.vigenciaFim?' até '+fmtData(l.vigenciaFim):'')+'</td><td><span style="color:'+corStatus[l.status]+'">'+l.statusLabel+'</span></td></tr>').join('')+
   '</tbody></table></div></div>' : '';
 
   el.innerHTML = subnav +
@@ -1947,13 +1960,13 @@ function exportarRelatorioCSV(){
   const linhas = window.__relatorioLinhasCache || [];
   const linhasCombo = window.__relatorioComboCache || [];
   if(!linhas.length && !linhasCombo.length) return;
-  const header = 'Categoria/Tipo;Produto;Custo;Preco;Vigente desde;Vigente ate\n';
+  const header = 'Categoria/Tipo;Produto;Itens;Custo;Preco;Vigente desde;Vigente ate;Status\n';
   const corpoProdutos = linhas.map(l =>
-    [l.categoria, l.nome, l.custo!=null?l.custo.toFixed(2).replace('.',','):'', l.preco.toFixed(2).replace('.',','), l.vigencia||'', '']
+    [l.categoria, l.nome, '', l.custo!=null?l.custo.toFixed(2).replace('.',','):'', l.preco.toFixed(2).replace('.',','), l.vigencia||'', '', 'Vigente agora']
       .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
   ).join('\n');
   const corpoCombos = linhasCombo.map(l =>
-    [l.tipo==='promocao'?'Promoção':'Combo', l.nome, '', l.preco.toFixed(2).replace('.',','), l.vigencia||'', l.vigenciaFim||'']
+    [l.tipo==='promocao'?'Promoção':'Combo', l.nome, l.itensTxt||'', '', l.preco.toFixed(2).replace('.',','), l.vigencia||'', l.vigenciaFim||'', l.statusLabel]
       .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
   ).join('\n');
   const corpo = [corpoProdutos, corpoCombos].filter(Boolean).join('\n');
