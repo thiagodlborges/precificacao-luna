@@ -377,6 +377,25 @@
   </div>
 </div>
 
+<!-- MODAL: Editar combo/promoção já existente (nome + preço vigente, mesmo já aprovado) -->
+<div class="modal-overlay" id="modalEditarCombo">
+  <div class="modal">
+    <h3>Editar Combo/Promoção</h3>
+    <div class="field" style="margin-bottom:10px"><label>Nome</label><input class="inp" id="ecNome"></div>
+    <div id="ecSemPreco" class="hint" style="display:none">Esse combo ainda não tem preço cadastrado — use Histórico → Novo Preço.</div>
+    <div id="ecPrecoWrap" style="display:none">
+      <p class="hint" id="ecPrecoStatusHint" style="margin-bottom:10px"></p>
+      <div class="row" style="margin-bottom:10px">
+        <div class="field" style="flex:1"><label>Preço</label><input class="inp" id="ecPreco" type="number" step="0.01" min="0"></div>
+        <div class="field" id="ecVigenciaFimWrap" style="flex:1;display:none"><label>Vigência até</label><input class="inp" id="ecVigenciaFim" type="date"></div>
+      </div>
+    </div>
+    <div class="msg" id="editarComboMsg"></div>
+    <div class="modal-actions"><button class="btn" onclick="salvarEdicaoCombo()" id="btnSalvarEdicaoCombo">Salvar</button></div>
+    <button class="modal-close" onclick="fecharModal('modalEditarCombo')">Cancelar</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = 'https://pbuhwpcpdcnaheaywmdv.supabase.co';
@@ -1390,6 +1409,7 @@ async function renderCombos(){
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'+
         '<h2 style="margin:0">'+esc(combo.nome)+' '+badgeVigencia+'</h2>'+
         '<div style="white-space:nowrap">'+
+          '<button class="btn-outline btn btn-sm" onclick="abrirEditarCombo(\''+combo.id+'\')">✏️ Editar</button> '+
           '<button class="btn-outline btn btn-sm" onclick="abrirHistoricoCombo(\''+combo.id+'\')">Histórico</button> '+
           (souMaster ? '<button class="btn-danger" onclick="excluirCombo(\''+combo.id+'\')">🗑️</button>' : '')+
         '</div>'+
@@ -1547,6 +1567,69 @@ async function excluirCombo(id){
   if(!confirm('Excluir este combo (itens e histórico de preço junto)? Essa ação é permanente.')) return;
   const { error } = await sb.from('precificacao_combos').delete().eq('id', id);
   if(error){ alert('Erro: '+error.message); return; }
+  renderCombos();
+}
+
+let comboEditandoAtual = null;
+
+async function abrirEditarCombo(comboId){
+  const combo = combosCache.find(c => c.id === comboId);
+  if(!combo) return;
+  comboEditandoAtual = combo;
+  $('ecNome').value = combo.nome;
+  showMsg('editarComboMsg','','');
+
+  const hoje = hojeISO();
+  const { data: precos } = await sb.from('precificacao_combo_precos').select('*')
+    .eq('combo_id', comboId).eq('status','aprovado')
+    .lte('vigencia_inicio', hoje).order('vigencia_inicio', { ascending:false });
+  const vigente = (precos||[]).find(p => !p.vigencia_fim || p.vigencia_fim >= hoje) || null;
+  comboEditandoAtual.precoVigente = vigente;
+
+  if(!vigente){
+    $('ecSemPreco').style.display = '';
+    $('ecPrecoWrap').style.display = 'none';
+  } else if(!souMaster){
+    $('ecSemPreco').style.display = 'none';
+    $('ecPrecoWrap').style.display = 'block';
+    $('ecPrecoStatusHint').textContent = 'Esse preço já está aprovado — só o master pode editá-lo direto aqui. Você pode renomear o combo acima.';
+    $('ecPreco').value = vigente.preco_combo; $('ecPreco').disabled = true;
+    $('ecVigenciaFimWrap').style.display = vigente.vigencia_fim!=null || combo.tipo==='promocao' ? '' : 'none';
+    $('ecVigenciaFim').value = vigente.vigencia_fim || ''; $('ecVigenciaFim').disabled = true;
+  } else {
+    $('ecSemPreco').style.display = 'none';
+    $('ecPrecoWrap').style.display = 'block';
+    $('ecPrecoStatusHint').textContent = 'Editando o preço já aprovado, vigente desde '+fmtData(vigente.vigencia_inicio)+' — a mudança vale na hora, sem precisar de nova aprovação.';
+    $('ecPreco').value = vigente.preco_combo; $('ecPreco').disabled = false;
+    $('ecVigenciaFimWrap').style.display = combo.tipo==='promocao' ? '' : 'none';
+    $('ecVigenciaFim').value = vigente.vigencia_fim || ''; $('ecVigenciaFim').disabled = false;
+  }
+
+  $('modalEditarCombo').classList.add('show');
+}
+
+async function salvarEdicaoCombo(){
+  const nome = $('ecNome').value.trim();
+  if(!nome){ showMsg('editarComboMsg','Dá um nome.','err'); return; }
+
+  const btn = $('btnSalvarEdicaoCombo');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+
+  if(nome !== comboEditandoAtual.nome){
+    const { error } = await sb.from('precificacao_combos').update({ nome }).eq('id', comboEditandoAtual.id);
+    if(error){ btn.disabled=false; btn.textContent='Salvar'; showMsg('editarComboMsg','Erro ao renomear: '+error.message,'err'); return; }
+  }
+
+  if(souMaster && comboEditandoAtual.precoVigente){
+    const preco_combo = Number($('ecPreco').value);
+    const vigencia_fim = comboEditandoAtual.tipo==='promocao' ? ($('ecVigenciaFim').value || null) : comboEditandoAtual.precoVigente.vigencia_fim;
+    if(!(preco_combo>=0)){ btn.disabled=false; btn.textContent='Salvar'; showMsg('editarComboMsg','Informe um preço válido.','err'); return; }
+    const { error } = await sb.from('precificacao_combo_precos').update({ preco_combo, vigencia_fim }).eq('id', comboEditandoAtual.precoVigente.id);
+    if(error){ btn.disabled=false; btn.textContent='Salvar'; showMsg('editarComboMsg','Erro ao salvar preço: '+error.message,'err'); return; }
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar';
+  fecharModal('modalEditarCombo');
   renderCombos();
 }
 
