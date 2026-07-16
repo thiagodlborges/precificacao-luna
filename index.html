@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Luna — Precificação (Loja)</title>
+<title>Luna — Controle de Perdas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -25,6 +25,8 @@
   .brand{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.4rem}
   .brand-sub{font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--marrom-light);margin-top:-2px}
   header .spacer{flex:1}
+  header select{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:var(--creme);padding:8px 12px;border-radius:6px;font-family:'Jost',sans-serif;font-size:.82rem}
+  header select option{color:var(--text)}
   .hbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:var(--creme);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:.78rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .15s}
   .hbtn:hover{background:rgba(255,255,255,.22)}
 
@@ -41,7 +43,6 @@
   .field label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);font-weight:500}
   .inp,select.inp,textarea.inp{padding:9px 12px;border:1.5px solid var(--creme-dark);border-radius:7px;font-family:'Jost',sans-serif;font-size:.85rem;color:var(--text);background:var(--white)}
   .inp:focus{outline:none;border-color:var(--marrom)}
-  .inp:disabled{opacity:.55}
   .btn{background:var(--bordo);color:var(--creme);border:none;padding:10px 18px;border-radius:7px;font-size:.78rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:background .15s}
   .btn:hover{background:var(--bordo-dark)}
   .btn:disabled{opacity:.5;cursor:default}
@@ -55,40 +56,19 @@
   th{text-align:left;padding:9px 10px;background:var(--creme);color:var(--text-light);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em}
   td{padding:9px 10px;border-top:1px solid var(--creme-dark);vertical-align:top}
   tr.inativo td{color:var(--text-light);opacity:.6}
+  tr.total-row td{font-weight:600;border-top:2px solid var(--creme-dark)}
   .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.68rem;font-weight:600;white-space:nowrap}
   .badge-ativo{background:#E8F8F0;color:#27AE60}
   .badge-inativo{background:#FDEDEC;color:#B43C3C}
   .badge-tipo{background:var(--creme);color:var(--marrom-dark)}
-  .badge-vigente{background:#E8F8F0;color:#27AE60}
-  .badge-agendado{background:#FEF6E7;color:#B8860B}
-  .badge-historico{background:var(--creme);color:var(--text-light)}
-  .badge-pendente{background:#EAF2FB;color:#2E6DA4}
-  .badge-rejeitado{background:#FDEDEC;color:#B43C3C}
-
-  .subnav{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
-  .subnav-item{padding:8px 16px;border-radius:20px;background:var(--white);border:1.5px solid var(--creme-dark);font-size:.8rem;font-weight:500;color:var(--text-light);cursor:pointer}
-  .subnav-item.active{background:var(--bordo);border-color:var(--bordo);color:var(--creme)}
-
-  .combo-item-row{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--creme);border-radius:7px;margin-bottom:6px;font-size:.8rem}
-  .combo-item-row .rm{background:none;border:none;color:#B43C3C;cursor:pointer;font-size:.95rem;padding:0 4px}
-  .alerta-desconto{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.68rem;font-weight:700}
-  .alerta-vermelho{background:#FDEDEC;color:#B43C3C}
-  .alerta-amarelo{background:#FEF6E7;color:#946200}
-  .chip{display:inline-block;background:var(--creme);color:var(--marrom-dark);padding:2px 9px;border-radius:12px;font-size:.7rem;margin:2px 4px 2px 0}
 
   .empty{text-align:center;padding:40px;color:var(--text-light);font-size:.85rem}
   .loading{text-align:center;padding:30px;color:var(--text-light)}
 
-  .margem-box{background:var(--creme);border:1px solid var(--creme-dark);border-radius:9px;padding:14px 16px;margin-bottom:14px}
-  .margem-box h4{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);font-weight:600;margin-bottom:10px}
-  .margem-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
-  .margem-item .lbl{font-size:.68rem;color:var(--text-light);margin-bottom:2px}
-  .margem-item .val{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:600;color:var(--bordo-dark);line-height:1.1}
-  .margem-item .val .pct{font-family:'Jost',sans-serif;font-size:.72rem;font-weight:500;color:var(--text-light);margin-left:4px}
-  .margem-item .val.neg{color:#B43C3C}
-  .mc-cell .r{font-weight:500}
-  .mc-cell .p{display:block;font-size:.7rem;color:var(--text-light)}
-  .mc-cell .r.neg{color:#B43C3C}
+  .stat-box{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:18px}
+  .stat{background:var(--creme);border-radius:10px;padding:18px 22px;min-width:170px}
+  .stat .num{font-family:'Cormorant Garamond',serif;font-size:2rem;color:var(--bordo-dark);font-weight:600;line-height:1}
+  .stat .lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin-top:6px}
 
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,24,16,.5);z-index:500;align-items:center;justify-content:center;padding:20px}
   .modal-overlay.show{display:flex}
@@ -116,8 +96,12 @@
 <div id="appRoot">
 <header>
   <div>
-    <div class="brand">LUNA <span style="font-size:.7em;font-weight:400">Precificação — Loja</span></div>
-    <div class="brand-sub">Custo, preço e tributos</div>
+    <div class="brand">LUNA <span style="font-size:.7em;font-weight:400">Perdas</span></div>
+    <div class="brand-sub">Controle de Perdas</div>
+  </div>
+  <div class="field" id="seletorLojaWrap" style="min-width:220px">
+    <label style="color:var(--marrom-light)">Loja</label>
+    <select id="seletorLoja" class="inp" onchange="onTrocarLoja()"></select>
   </div>
   <div class="spacer"></div>
   <a href="https://thiagodlborges.github.io/Sistema-Luna/" class="hbtn">← Sistema Luna</a>
@@ -125,278 +109,16 @@
 </header>
 
 <nav class="tabs">
-  <div class="tab active" id="tabProdutos" data-tab="produtos" onclick="mudarTab('produtos')">📦 Produtos</div>
-  <div class="tab" id="tabTributos" data-tab="tributos" onclick="mudarTab('tributos')">🧾 Tributos</div>
-  <div class="tab" id="tabPrecos" data-tab="precos" onclick="mudarTab('precos')">💲 Preços</div>
-  <div class="tab" id="tabCombos" data-tab="combos" onclick="mudarTab('combos')">🎁 Combos e Promoções</div>
-  <div class="tab" id="tabInsumos" data-tab="insumos" onclick="mudarTab('insumos')">📦 Insumos</div>
-  <div class="tab" id="tabAprovacoes" data-tab="aprovacoes" onclick="mudarTab('aprovacoes')">✅ Aprovações<span id="badgePendentes"></span></div>
-  <div class="tab" id="tabRelatorio" data-tab="relatorio" onclick="mudarTab('relatorio')">🧾 Relatório</div>
+  <div class="tab active" id="tabNova" data-tab="nova" onclick="mudarTab('nova')">➕ Nova Perda</div>
+  <div class="tab" id="tabHistorico" data-tab="historico" onclick="mudarTab('historico')">📋 Histórico</div>
+  <div class="tab" id="tabRelatorio" style="display:none" data-tab="relatorio" onclick="mudarTab('relatorio')">📊 Relatório Mensal</div>
 </nav>
 
 <main id="mainContent"><div class="loading">Carregando…</div></main>
 </div>
 
-<!-- MODAL: Novo/editar produto -->
-<div class="modal-overlay" id="modalProduto">
-  <div class="modal" style="max-width:560px">
-    <h3 id="tituloProduto">Novo Produto</h3>
-    <div class="field" style="margin-bottom:10px"><label>Nome</label><input class="inp" id="pdNome" placeholder="Ex: Gelato Chocolate, Pote 500ml, Água mineral"></div>
-    <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1">
-        <label>Categoria</label>
-        <input class="inp" id="pdCategoria" list="categoriasDatalist" placeholder="Clique na seta ou digite">
-        <datalist id="categoriasDatalist"></datalist>
-        <p class="hint" style="margin-top:4px">Não existe uma tela separada de categorias — é aqui mesmo. Clique no campo pra ver as que já existem, ou simplesmente digite um nome novo (ex: "Salgados") que ele já cria essa categoria ao salvar o produto.</p>
-      </div>
-      <div class="field" style="flex:1">
-        <label>Origem</label>
-        <select class="inp" id="pdOrigem" onchange="onOrigemProdutoChange()">
-          <option value="revenda">Revenda (2 elos: loja→consumidor, loja→delivery) — comprado pronto de fornecedor externo</option>
-          <option value="consumo_loja">Feito na loja (2 elos: loja→consumidor, loja→delivery) — montado ali, sem compra própria</option>
-        </select>
-      </div>
-    </div>
-    <label id="pdAtivoWrap" style="display:none;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">
-      <input type="checkbox" id="pdAtivo" style="width:16px;height:16px" checked> Produto ativo
-    </label>
-
-    <div id="pdInsumosSection" style="display:none;margin-top:16px">
-      <label>Composição do custo (insumos, embalagem, gelato etc. — soma automaticamente)</label>
-      <div class="row" style="margin:6px 0 8px">
-        <div class="field" style="flex:2"><label>Insumo</label><select class="inp" id="pdAddInsumo"></select></div>
-        <div class="field" style="width:64px"><label>Qtd</label><input class="inp" id="pdAddInsumoQtd" type="number" min="0.01" step="0.01" value="1"></div>
-        <button class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarInsumoProduto()">+ Add</button>
-      </div>
-      <div id="pdInsumosLista"></div>
-      <div id="pdComposicaoResumo" class="hint" style="margin-top:8px"></div>
-    </div>
-
-    <div class="msg" id="produtoMsg"></div>
-    <div class="modal-actions"><button class="btn" onclick="salvarProduto()" id="btnSalvarProduto">Salvar</button></div>
-    <button class="modal-close" onclick="fecharModal('modalProduto')">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL: Novo/editar insumo -->
-<div class="modal-overlay" id="modalInsumo">
-  <div class="modal">
-    <h3 id="tituloInsumo">Novo Insumo</h3>
-    <div class="field" style="margin-bottom:10px"><label>Nome</label><input class="inp" id="inNome" placeholder="Ex: Cinta para Isopor 1,3L, Pote de Isopor 700ml..."></div>
-    <div class="row" style="margin-bottom:6px">
-      <div class="field" style="flex:1"><label>Custo unitário (R$)</label><input class="inp" id="inCusto" type="number" step="0.0001" min="0"></div>
-      <div class="field" style="flex:1"><label>Unidade</label><input class="inp" id="inUnidade" placeholder="g, ml, un, dose..." oninput="atualizarLabelCalculadora()"></div>
-    </div>
-    <details style="margin-bottom:10px">
-      <summary style="cursor:pointer;font-size:.78rem;color:var(--bordo)">Não sei o custo unitário de cabeça — calcular a partir do que eu paguei</summary>
-      <div class="row" style="margin-top:8px">
-        <div class="field" style="flex:1"><label>Paguei no total (R$)</label><input class="inp" id="inCalcPreco" type="number" step="0.01" min="0"></div>
-        <div class="field" style="flex:1"><label id="inCalcRendimentoLabel">Rende quantos (na unidade acima)</label><input class="inp" id="inCalcRendimento" type="number" step="0.01" min="0"></div>
-      </div>
-      <button type="button" class="btn-outline btn btn-sm" onclick="calcularCustoUnitarioInsumo()">Calcular e preencher custo unitário</button>
-      <p class="hint" style="margin-top:6px">Ex: paguei R$45 num pacote de 1kg de café e vou usar a unidade "g" acima → rendimento 1000 → preenche R$0,045/g.</p>
-    </details>
-    <label id="inAtivoWrap" style="display:none;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">
-      <input type="checkbox" id="inAtivo" style="width:16px;height:16px" checked> Insumo ativo
-    </label>
-    <div class="msg" id="insumoMsg"></div>
-    <div class="modal-actions"><button class="btn" onclick="salvarInsumo()" id="btnSalvarInsumo">Salvar</button></div>
-    <button class="modal-close" onclick="fecharModal('modalInsumo')">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL: Novo/editar tributo -->
-<div class="modal-overlay" id="modalTributo">
-  <div class="modal">
-    <h3 id="tituloTributo">Novo Tributo</h3>
-    <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1">
-        <label>Elo</label>
-        <select class="inp" id="trElo">
-          <option value="loja_consumidor">Loja → Consumidor</option>
-          <option value="loja_delivery">Loja → Delivery</option>
-        </select>
-      </div>
-      <div class="field" style="flex:1"><label>Categoria</label><input class="inp" id="trCategoria" placeholder="Gelato, Bebida..."></div>
-    </div>
-    <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1"><label>Tipo de tributo</label><input class="inp" id="trTipo" placeholder="ICMS, Simples, ISS, PIS/Cofins..."></div>
-      <div class="field" style="flex:1"><label>Alíquota (%) — débito na venda</label><input class="inp" id="trAliquota" type="number" step="0.01" min="0"></div>
-    </div>
-    <div class="field" style="margin-bottom:10px">
-      <label>Alíquota de crédito (%) — recuperável na compra</label>
-      <input class="inp" id="trAliquotaCredito" type="number" step="0.01" min="0" placeholder="0 se este tributo não gera crédito">
-    </div>
-    <p class="hint" style="margin-top:-4px">Preenche só pra tributos recuperáveis no regime não-cumulativo (ex: PIS/Cofins). Pra ICMS, ISS, Simples etc., deixa 0.</p>
-    <div class="field" style="margin-bottom:0"><label>Vigência a partir de</label><input class="inp" id="trVigencia" type="date"></div>
-    <div class="msg" id="tributoMsg"></div>
-    <div class="modal-actions"><button class="btn" onclick="salvarTributo()" id="btnSalvarTributo">Salvar</button></div>
-    <button class="modal-close" onclick="fecharModal('modalTributo')">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL: Histórico de preços de um produto -->
-<div class="modal-overlay" id="modalHistorico">
-  <div class="modal" style="max-width:900px;width:96%;max-height:88vh;display:flex;flex-direction:column">
-    <h3 id="tituloHistorico">Histórico de Preços</h3>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-      <input class="inp" id="historicoFiltro" placeholder="Buscar por elo, tributo, data, status..." style="margin-bottom:0;max-width:320px;flex:1" oninput="renderHistoricoTabela()">
-      <button class="btn" style="width:auto;padding:10px 18px" onclick="abrirNovoPreco()">+ Novo Preço</button>
-    </div>
-    <div style="overflow:auto;flex:1">
-      <div id="historicoConteudo" class="loading">Carregando…</div>
-    </div>
-    <button class="modal-close" onclick="fecharModal('modalHistorico')">Fechar</button>
-  </div>
-</div>
-
-<!-- MODAL: Novo/editar preço -->
-<div class="modal-overlay" id="modalPreco">
-  <div class="modal">
-    <h3 id="tituloPreco">Novo Preço</h3>
-    <p class="hint" style="margin-bottom:10px" id="pcProdutoNome"></p>
-    <div class="field" style="margin-bottom:10px">
-      <label>Elo</label>
-      <select class="inp" id="pcElo" onchange="atualizarTributosDoModalPreco()"></select>
-    </div>
-    <div class="row" style="margin-bottom:4px">
-      <div class="field" style="flex:1"><label>Custo (R$)</label><input class="inp" id="pcCusto" type="number" step="0.01" min="0" oninput="atualizarMargensModal()"></div>
-      <div class="field" style="flex:1"><label>Preço de venda (R$)</label><input class="inp" id="pcPrecoVenda" type="number" step="0.01" min="0" oninput="atualizarMargensModal()"></div>
-    </div>
-    <label id="pcCustoCreditoWrap" style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;margin-bottom:10px;font-size:.8rem;color:var(--text-light)">
-      <input type="checkbox" id="pcCustoTomaCredito" checked style="width:16px;height:16px" onchange="atualizarMargensModal()"> Esse custo (sem detalhar por item) toma crédito de imposto
-    </label>
-    <details id="pcComposicaoDetails" style="margin-bottom:10px">
-      <summary style="cursor:pointer;font-size:.8rem;color:var(--bordo);font-weight:600">🧮 Compor o custo a partir de insumos/gelato (grão, embalagem, gelato...)</summary>
-      <div style="margin-top:10px;padding:12px;background:var(--creme,#faf6f0);border-radius:8px">
-        <div id="pcInsumosLista" style="margin-bottom:8px"></div>
-        <div class="row" style="margin-bottom:8px">
-          <div class="field" style="flex:2"><label>Insumo</label><select class="inp" id="pcAddInsumo"></select></div>
-          <div class="field" style="width:80px"><label>Qtd</label><input class="inp" id="pcAddInsumoQtd" type="number" min="0.001" step="0.001" value="1"></div>
-          <button type="button" class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarInsumoNoPreco()">+ Add</button>
-        </div>
-        <p class="hint" id="pcComposicaoResumo" style="margin:0"></p>
-      </div>
-    </details>
-    <div class="field" style="margin-bottom:10px">
-      <label>Impostos aplicados (marque quantos incidirem — nada de "blend")</label>
-      <div id="pcTributosLista" style="display:flex;flex-direction:column;gap:6px;padding:10px;border:1.5px solid var(--creme-dark);border-radius:8px"></div>
-    </div>
-    <div class="margem-box">
-      <h4>Margem de contribuição (calculada, não é salva — sempre reflete os campos acima)</h4>
-      <div class="margem-grid" id="pcMargensGrid"></div>
-    </div>
-    <div class="field" style="margin-bottom:0"><label>Vigência a partir de</label><input class="inp" id="pcVigencia" type="date"></div>
-    <div class="msg" id="precoMsg"></div>
-    <div class="modal-actions"><button class="btn" onclick="salvarPreco()" id="btnSalvarPreco">Salvar</button></div>
-    <button class="modal-close" onclick="fecharModal('modalPreco')">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL: Novo combo (item + preço inicial) -->
-<div class="modal-overlay" id="modalCombo">
-  <div class="modal" style="max-width:600px">
-    <h3 id="tituloCombo">Novo Combo</h3>
-    <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1"><label>Tipo</label>
-        <select class="inp" id="cbTipo" onchange="onTipoComboChange()">
-          <option value="combo">Combo (tempo indeterminado)</option>
-          <option value="promocao">Promoção (tempo limitado)</option>
-        </select>
-      </div>
-      <div class="field" style="flex:2"><label>Nome</label><input class="inp" id="cbNome" placeholder="Ex: Combo Casal, Promoção Dia das Mães..."></div>
-    </div>
-
-    <label>Itens</label>
-    <div class="row" style="margin:6px 0 8px">
-      <div class="field" style="flex:2"><label>Produto</label><select class="inp" id="cbAddProduto" onchange="onProdutoComboChange()"></select></div>
-      <div class="field" style="flex:1"><label>Elo</label><select class="inp" id="cbAddElo"></select></div>
-      <div class="field" style="width:64px"><label>Qtd</label><input class="inp" id="cbAddQtd" type="number" min="1" value="1"></div>
-      <button class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarItemCombo()">+ Add</button>
-    </div>
-    <div id="cbItensLista" style="margin-bottom:14px"></div>
-    <p class="hint" id="cbItensMinHint" style="margin:-8px 0 14px"></p>
-
-    <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1"><label>Preço (R$)</label><input class="inp" id="cbPreco" type="number" step="0.01" min="0" oninput="atualizarResumoCombo()"></div>
-      <div class="field" style="flex:1"><label>Vigência a partir de</label><input class="inp" id="cbVigencia" type="date"></div>
-      <div class="field" id="cbVigenciaFimWrap" style="flex:1;display:none"><label>Vigência até</label><input class="inp" id="cbVigenciaFim" type="date"></div>
-    </div>
-    <div class="field" style="margin-bottom:10px">
-      <label>Tributo aplicado (opcional)</label>
-      <select class="inp" id="cbTributo" onchange="atualizarResumoCombo()"><option value="">— nenhum —</option></select>
-    </div>
-
-    <div class="margem-box">
-      <h4>Resumo (calculado, não é salvo)</h4>
-      <div class="margem-grid" id="cbResumoGrid"></div>
-    </div>
-
-    <div class="msg" id="comboMsg"></div>
-    <div class="modal-actions"><button class="btn" onclick="salvarNovoCombo()" id="btnSalvarCombo">Salvar</button></div>
-    <button class="modal-close" onclick="fecharModal('modalCombo')">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL: Histórico de preço de um combo -->
-<div class="modal-overlay" id="modalHistoricoCombo">
-  <div class="modal" style="max-width:820px;width:96%;max-height:88vh;display:flex;flex-direction:column">
-    <h3 id="tituloHistoricoCombo">Histórico do Combo</h3>
-    <p class="hint" id="comboItensResumo" style="margin-bottom:10px"></p>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-      <button class="btn" style="width:auto;padding:10px 18px" onclick="abrirNovoPrecoCombo()">+ Novo Preço</button>
-    </div>
-    <div style="overflow:auto;flex:1">
-      <div id="historicoComboConteudo" class="loading">Carregando…</div>
-    </div>
-    <button class="modal-close" onclick="fecharModal('modalHistoricoCombo')">Fechar</button>
-  </div>
-</div>
-
-<!-- MODAL: Novo preço pra combo já existente -->
-<div class="modal-overlay" id="modalPrecoCombo">
-  <div class="modal">
-    <h3>Novo Preço do Combo</h3>
-    <p class="hint" id="pcComboNome" style="margin-bottom:10px"></p>
-    <div class="row" style="margin-bottom:10px">
-      <div class="field" style="flex:1"><label>Preço do combo (R$)</label><input class="inp" id="pcComboPreco" type="number" step="0.01" min="0" oninput="atualizarResumoPrecoCombo()"></div>
-      <div class="field" style="flex:1"><label>Vigência a partir de</label><input class="inp" id="pcComboVigencia" type="date"></div>
-      <div class="field" id="pcComboVigenciaFimWrap" style="flex:1;display:none"><label>Vigência até</label><input class="inp" id="pcComboVigenciaFim" type="date"></div>
-    </div>
-    <div class="field" style="margin-bottom:10px">
-      <label>Tributo aplicado (opcional)</label>
-      <select class="inp" id="pcComboTributo" onchange="atualizarResumoPrecoCombo()"><option value="">— nenhum —</option></select>
-    </div>
-    <div class="margem-box">
-      <h4>Resumo (calculado, não é salvo)</h4>
-      <div class="margem-grid" id="pcComboResumoGrid"></div>
-    </div>
-    <div class="msg" id="precoComboMsg"></div>
-    <div class="modal-actions"><button class="btn" onclick="salvarPrecoCombo()" id="btnSalvarPrecoCombo">Salvar</button></div>
-    <button class="modal-close" onclick="fecharModal('modalPrecoCombo')">Cancelar</button>
-  </div>
-</div>
-
-<!-- MODAL: Editar combo/promoção já existente (nome + preço vigente, mesmo já aprovado) -->
-<div class="modal-overlay" id="modalEditarCombo">
-  <div class="modal">
-    <h3>Editar Combo/Promoção</h3>
-    <div class="field" style="margin-bottom:10px"><label>Nome</label><input class="inp" id="ecNome"></div>
-    <div id="ecSemPreco" class="hint" style="display:none">Esse combo ainda não tem preço cadastrado — use Histórico → Novo Preço.</div>
-    <div id="ecPrecoWrap" style="display:none">
-      <p class="hint" id="ecPrecoStatusHint" style="margin-bottom:10px"></p>
-      <div class="row" style="margin-bottom:10px">
-        <div class="field" style="flex:1"><label>Preço</label><input class="inp" id="ecPreco" type="number" step="0.01" min="0"></div>
-        <div class="field" id="ecVigenciaFimWrap" style="flex:1;display:none"><label>Vigência até</label><input class="inp" id="ecVigenciaFim" type="date"></div>
-      </div>
-    </div>
-    <div class="msg" id="editarComboMsg"></div>
-    <div class="modal-actions"><button class="btn" onclick="salvarEdicaoCombo()" id="btnSalvarEdicaoCombo">Salvar</button></div>
-    <button class="modal-close" onclick="fecharModal('modalEditarCombo')">Cancelar</button>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const SUPABASE_URL = 'https://pbuhwpcpdcnaheaywmdv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidWh3cGNwZGNuYWhlYXl3bWR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjU5MzksImV4cCI6MjA5MTg0MTkzOX0.Mg4PVg96ZiV3C2Rn0GLQU9c7ui_41OlU6Ldqn5jcvyY';
@@ -404,71 +126,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PORTAL_URL = 'https://thiagodlborges.github.io/Sistema-Luna/';
 const $ = id => document.getElementById(id);
 
-const ELOS_POR_ORIGEM = { fabrica: ['loja_consumidor','loja_delivery'], revenda: ['loja_consumidor','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
-const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda', loja_delivery: 'Loja → Delivery' };
-const ORIGEM_LABEL = { fabrica: 'Fábrica', fabrica_insumo: 'Insumo (só peso)', revenda: 'Revenda (fornecedor externo)', consumo_loja: 'Feito na loja' };
+const TODAS_LOJAS = ['Esplanada','Cianê','Tucuruvi','Indaiatuba','Jundiaí','Praça da Moça - Diadema','Buriti Mogi Guaçu','SP Market','Iguatemi Campinas','Shopping Itaquera','Atrium'];
+const MOTIVOS = ['Vencimento','Cristalização','Impróprio para Consumo','Extravio','Desperdício','Furto','Degustação','Treinamento','Outro'];
 
 let meuPerfil = null;
+let minhasLojas = [];
+let lojaAtual = null;
+let currentTab = 'nova';
+let souBackoffice = false;
 let souMaster = false;
-let souBackofficePrecificacao = false;
-let currentTab = 'produtos';
+let temPapelDeLoja = false;
+let produtosPrecificacaoCache = null;
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtData(d){ return d ? new Date(d+'T12:00').toLocaleDateString('pt-BR') : '—'; }
 function fmtMoeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
-function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })+'%'; }
-
-// MC Bruta é sobre o faturamento bruto (preço de venda); MC Líquida é sobre a receita líquida de impostos.
-// Impostos líquidos = débito (aliquota % sobre preço de venda) − crédito (aliquota_credito % sobre custo, ex: PIS/Cofins não-cumulativo).
-function calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito, baseCredito){
-  custo = Number(custo)||0;
-  precoVenda = Number(precoVenda)||0;
-  aliquotaDebito = Number(aliquotaDebito)||0;
-  aliquotaCredito = Number(aliquotaCredito)||0;
-  baseCredito = baseCredito == null ? custo : Number(baseCredito)||0;
-  const debito = precoVenda * (aliquotaDebito/100);
-  const credito = baseCredito * (aliquotaCredito/100);
-  const impostos = debito - credito;
-  const receitaLiquida = precoVenda - impostos;
-  const mcBrutaR = precoVenda - custo;
-  const mcBrutaPct = precoVenda > 0 ? (mcBrutaR/precoVenda*100) : 0;
-  const mcLiquidaR = receitaLiquida - custo;
-  const mcLiquidaPct = receitaLiquida > 0 ? (mcLiquidaR/receitaLiquida*100) : 0;
-  return { debito, credito, impostos, receitaLiquida, mcBrutaR, mcBrutaPct, mcLiquidaR, mcLiquidaPct };
-}
-
-function baseCreditoAtual(){
-  const vinculados = window.__pcInsumosVinculados || [];
-  if(vinculados.length){
-    return vinculados.reduce((soma, v) => {
-      if(!v.toma_credito) return soma;
-      return soma + v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
-    }, 0);
-  }
-  const custo = Number($('pcCusto').value) || 0;
-  return $('pcCustoTomaCredito').checked ? custo : 0;
-}
-
-function atualizarMargensModal(){
-  const grid = $('pcMargensGrid');
-  if(!grid) return;
-  const custo = $('pcCusto').value;
-  const precoVenda = $('pcPrecoVenda').value;
-  const checks = [...document.querySelectorAll('.pc-tributo-check:checked')];
-  const aliquotaDebito = checks.reduce((s,c) => s + Number(c.dataset.aliquota||0), 0);
-  const aliquotaCredito = checks.reduce((s,c) => s + Number(c.dataset.aliquotaCredito||0), 0);
-  const baseCredito = baseCreditoAtual();
-  const m = calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito, baseCredito);
-  const impostosLbl = checks.length
-    ? (checks.length===1 ? checks[0].parentElement.textContent.split('—')[0].trim() : checks.length+' impostos')+' — déb. '+fmtPct(aliquotaDebito)+(aliquotaCredito>0?' / créd. '+fmtPct(aliquotaCredito):'')
-    : 'Impostos (nenhum selecionado)';
-  grid.innerHTML =
-    '<div class="margem-item"><div class="lbl">'+impostosLbl+'</div><div class="val">'+fmtMoeda(m.impostos)+'</div></div>'+
-    '<div class="margem-item"><div class="lbl">Receita Líquida</div><div class="val">'+fmtMoeda(m.receitaLiquida)+'</div></div>'+
-    '<div class="margem-item"><div class="lbl">MC Bruta (s/ faturamento)</div><div class="val'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'<span class="pct">'+fmtPct(m.mcBrutaPct)+'</span></div></div>'+
-    '<div class="margem-item"><div class="lbl">MC Líquida (s/ receita líquida)</div><div class="val'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'<span class="pct">'+fmtPct(m.mcLiquidaPct)+'</span></div></div>';
-}
-function hojeISO(){ return new Date().toISOString().slice(0,10); }
 function fecharModal(id){ $(id).classList.remove('show'); }
 function showMsg(id, txt, tipo){ const m=$(id); m.textContent=txt; m.className='msg'+(txt?' show '+(tipo||''):''); }
 
@@ -481,31 +153,42 @@ async function verificarAcessoEIniciar(){
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = PORTAL_URL; return; }
 
-  const { data: perfil, error } = await sb.from('perfis').select('*').eq('id', session.user.id).single();
-  if (error || !perfil) { window.location.href = PORTAL_URL; return; }
+  const { data: ok, error } = await sb.rpc('tem_acesso', { p_slug: 'perdas' });
+  if (error || !ok) { await sb.auth.signOut(); window.location.href = PORTAL_URL; return; }
 
-  souMaster = perfil.tipo === 'master';
-  const souBackoffice = souMaster || perfil.precificacao_loja_backoffice === true;
-  if (!souBackoffice) { await sb.auth.signOut(); window.location.href = PORTAL_URL; return; }
-  souBackofficePrecificacao = souBackoffice;
-
+  const { data: perfil } = await sb.from('perfis').select('*').eq('id', session.user.id).single();
+  if (!perfil) { window.location.href = PORTAL_URL; return; }
   meuPerfil = perfil;
+
+  temPapelDeLoja = ['loja','master_loja','master'].includes(perfil.tipo);
+  souBackoffice = perfil.tipo === 'master' || perfil.perdas_backoffice === true;
+  souMaster = perfil.tipo === 'master';
+
+  if (perfil.tipo === 'master' || perfil.tipo === 'master_loja') minhasLojas = [...TODAS_LOJAS];
+  else if (perfil.lojas && perfil.lojas.length) minhasLojas = perfil.lojas;
+  else if (perfil.loja) minhasLojas = [perfil.loja];
+  else minhasLojas = [];
+
+  if (!temPapelDeLoja || !minhasLojas.length) {
+    // Backoffice puro (tipo externo, sem loja) — esconde as telas de loja
+    ['tabNova','tabHistorico'].forEach(id => { const el = $(id); if (el) el.remove(); });
+    $('seletorLojaWrap').style.display = 'none';
+    currentTab = souBackoffice ? 'relatorio' : 'nova';
+  } else {
+    const sel = $('seletorLoja');
+    sel.innerHTML = minhasLojas.map(l => '<option value="'+esc(l)+'">'+esc(l)+'</option>').join('');
+    lojaAtual = minhasLojas[0];
+  }
+
+  if (souBackoffice) { $('tabRelatorio').style.display = ''; }
+
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===currentTab));
   document.getElementById('appRoot').style.display = 'block';
   document.getElementById('carregandoOverlay').remove();
   renderTab();
-  atualizarBadgePendentes();
-  sb.rpc('atualizar_custo_gelato_insumo').then(({error}) => { if(error) console.error('Erro ao atualizar custo do gelato:', error.message); });
 }
 
-async function atualizarBadgePendentes(){
-  const [pR, tR, cR] = await Promise.all([
-    sb.from('precificacao_precos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
-    sb.from('precificacao_tributos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
-    sb.from('precificacao_combo_precos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
-  ]);
-  const total = (pR.count || 0) + (tR.count || 0) + (cR.count || 0);
-  $('badgePendentes').innerHTML = total > 0 ? ' <span class="badge badge-pendente">'+total+'</span>' : '';
-}
+function onTrocarLoja(){ lojaAtual = $('seletorLoja').value; renderTab(); }
 
 function mudarTab(tab){
   currentTab = tab;
@@ -514,1550 +197,276 @@ function mudarTab(tab){
 }
 
 function renderTab(){
-  if(currentTab==='produtos') renderProdutos();
-  else if(currentTab==='tributos') renderTributos();
-  else if(currentTab==='precos') renderPrecos();
-  else if(currentTab==='combos') renderCombos();
-  else if(currentTab==='insumos') renderInsumos();
-  else if(currentTab==='aprovacoes') renderAprovacoes();
+  if(currentTab==='nova') renderNovaPerda();
+  else if(currentTab==='historico') renderHistorico();
   else if(currentTab==='relatorio') renderRelatorio();
 }
 
-// ── PRODUTOS ───────────────────────────────────────────────
-let produtoEditandoId = null;
-let produtosCache = [];
-
-async function renderProdutos(){
+// ── NOVA PERDA ────────────────────────────────────────────
+async function renderNovaPerda(){
   const el = $('mainContent');
+  const hoje = new Date().toISOString().slice(0,10);
   el.innerHTML =
     '<div class="card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
-        '<h2 style="margin:0">Produtos</h2>'+
-        '<button class="btn" onclick="abrirNovoProduto()">+ Novo Produto</button>'+
+      '<h2>Nova Perda — '+esc(lojaAtual)+'</h2>'+
+      '<div id="itemFieldsWrap" class="row"><div class="loading">Carregando…</div></div>'+
+      '<div class="row">'+
+        '<div class="field"><label>Data da perda</label><input class="inp" type="date" id="perdaData" value="'+hoje+'" max="'+hoje+'"></div>'+
+        '<div class="field"><label>Motivo</label><select class="inp" id="perdaMotivo">'+
+          MOTIVOS.map(m=>'<option value="'+m+'">'+m+'</option>').join('')+
+        '</select></div>'+
       '</div>'+
-      '<p class="hint">Fábrica: produto acabado (3 elos). Insumo: só vendido por peso, nunca ao consumidor (1 elo). Revenda: comprado pronto de fornecedor (2 elos). Feito na loja: montado ali, sem compra própria (2 elos).</p>'+
-      '<div id="produtosTabela" class="loading">Carregando…</div>'+
+      '<div class="field" style="margin-bottom:14px"><label>Observação (opcional)</label><textarea class="inp" id="perdaObs" rows="2"></textarea></div>'+
+      '<div class="msg" id="novaPerdaMsg"></div>'+
+      '<button class="btn" id="btnRegistrarPerda" onclick="registrarPerda()">Registrar Perda</button>'+
     '</div>';
-  await carregarProdutos();
+  await carregarSeletorProduto();
 }
 
-function atualizarCategoriasDatalist(){
-  const categorias = [...new Set((produtosCache||[]).map(p => p.categoria).filter(Boolean))].sort();
-  $('categoriasDatalist').innerHTML = categorias.map(c => '<option value="'+esc(c)+'">').join('');
+async function carregarProdutosPrecificacao(){
+  if(produtosPrecificacaoCache) return produtosPrecificacaoCache;
+  const { data, error } = await sb.rpc('get_precificacao_produtos_ativos');
+  if(error) throw error;
+  produtosPrecificacaoCache = data || [];
+  return produtosPrecificacaoCache;
 }
 
-async function carregarProdutos(){
-  const { data, error } = await sb.from('precificacao_produtos').select('*').in('origem', ['revenda','consumo_loja']).order('nome');
-  if(error){ $('produtosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
-  produtosCache = data || [];
-  atualizarCategoriasDatalist();
-  if(!produtosCache.length){ $('produtosTabela').innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'; return; }
+async function carregarSeletorProduto(){
+  const wrap = $('itemFieldsWrap');
+  if(!wrap) return;
+  wrap.innerHTML = '<div class="loading">Carregando…</div>';
+  showMsg('novaPerdaMsg','','');
 
-  $('produtosTabela').innerHTML =
-    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Categoria</th><th>Origem</th><th>Status</th><th></th></tr></thead><tbody>'+
-      produtosCache.map(p => (
-        '<tr class="'+(p.ativo?'':'inativo')+'">'+
-          '<td>'+esc(p.nome)+'</td>'+
-          '<td>'+esc(p.categoria)+'</td>'+
-          '<td><span class="badge badge-tipo">'+(ORIGEM_LABEL[p.origem]||p.origem)+'</span></td>'+
-          '<td>'+(p.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
-          '<td style="white-space:nowrap">'+
-            '<button class="btn-outline btn btn-sm" onclick="abrirEditarProduto(\''+p.id+'\')">Editar</button> '+
-            '<button class="btn-danger" onclick="toggleAtivoProduto(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Desativar':'Reativar')+'</button> '+
-            (souMaster ? '<button class="btn-danger" onclick="excluirProduto(\''+p.id+'\')">🗑️</button>' : '')+
-          '</td>'+
-        '</tr>'
-      )).join('')+
-    '</tbody></table></div>';
-}
+  let produtos;
+  try { produtos = await carregarProdutosPrecificacao(); }
+  catch(error){ wrap.innerHTML = '<div class="empty">Erro ao carregar produtos: '+esc(error.message)+'</div>'; return; }
 
-function onOrigemProdutoChange(){} // reservado — sem dependências hoje
-
-function abrirNovoProduto(){
-  produtoEditandoId = null;
-  $('tituloProduto').textContent = 'Novo Produto';
-  $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='consumo_loja';
-  $('pdAtivoWrap').style.display = 'none';
-  $('pdInsumosSection').style.display = 'none';
-  showMsg('produtoMsg','','');
-  $('modalProduto').classList.add('show');
-}
-
-async function abrirEditarProduto(id){
-  const p = produtosCache.find(x => x.id === id);
-  if(!p) return;
-  produtoEditandoId = id;
-  $('tituloProduto').textContent = 'Editar Produto';
-  $('pdNome').value = p.nome; $('pdCategoria').value = p.categoria; $('pdOrigem').value = p.origem;
-  $('pdAtivoWrap').style.display = 'flex'; $('pdAtivo').checked = !!p.ativo;
-  showMsg('produtoMsg','','');
-  $('modalProduto').classList.add('show');
-
-  $('pdInsumosSection').style.display = 'block';
-  await carregarInsumosDoProduto(id);
-}
-
-function atualizarPreviaComposicao(){
-  const vinculados = window.__insumosVinculadosCache || [];
-  let total = 0;
-  vinculados.forEach(v => { total += v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0); });
-
-  $('pdComposicaoResumo').innerHTML = vinculados.length
-    ? '<strong>Total da composição: '+fmtMoeda(total)+'</strong> (some isso ao lançar um novo custo)'
-    : 'Nenhum componente vinculado ainda.';
-}
-
-async function salvarProduto(){
-  const nome = $('pdNome').value.trim();
-  const categoria = $('pdCategoria').value.trim();
-  const origem = $('pdOrigem').value;
-  if(!nome || !categoria){ showMsg('produtoMsg','Preencha nome e categoria.','err'); return; }
-
-  const payload = { nome, categoria, origem };
-  if(produtoEditandoId) payload.ativo = $('pdAtivo').checked;
-
-  const btn = $('btnSalvarProduto');
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  let error;
-  if(produtoEditandoId){
-    ({ error } = await sb.from('precificacao_produtos').update(payload).eq('id', produtoEditandoId));
-  } else {
-    ({ error } = await sb.from('precificacao_produtos').insert({ ...payload, ativo: true }));
-  }
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(error){ showMsg('produtoMsg','Erro: '+error.message,'err'); return; }
-  fecharModal('modalProduto');
-  renderProdutos();
-}
-
-async function toggleAtivoProduto(id, novoValor){
-  const { error } = await sb.from('precificacao_produtos').update({ ativo: novoValor }).eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  renderProdutos();
-}
-
-async function excluirProduto(id){
-  if(!confirm('Excluir este produto e todo o histórico de preços dele? Essa ação é permanente.')) return;
-  const { error } = await sb.from('precificacao_produtos').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message+(error.message.includes('foreign key')?' — apague antes os preços desse produto no histórico.':'')); return; }
-  renderProdutos();
-}
-
-// ── vínculo de insumos num produto (dentro do modal de produto) ──
-async function carregarInsumosDoProduto(produtoId){
-  const [{ data: vinculados }, { data: todosInsumos }] = await Promise.all([
-    sb.from('precificacao_produto_insumos').select('*, precificacao_insumos(nome, custo_unitario, unidade)').eq('produto_id', produtoId),
-    sb.from('precificacao_insumos').select('*').eq('ativo', true).order('nome'),
-  ]);
-  window.__insumosVinculadosCache = vinculados || [];
-  window.__insumosCatalogoCache = todosInsumos || [];
-  window.__produtoInsumosAtual = produtoId;
-
-  $('pdAddInsumo').innerHTML = (todosInsumos||[]).map(i => '<option value="'+i.id+'">'+esc(i.nome)+' ('+fmtMoeda(i.custo_unitario)+'/'+esc(i.unidade||'un')+')</option>').join('');
-  renderInsumosDoProdutoLista();
-}
-
-function renderInsumosDoProdutoLista(){
-  const vinculados = window.__insumosVinculadosCache || [];
-  $('pdInsumosLista').innerHTML = !vinculados.length ? '<p class="hint">Nenhum insumo vinculado.</p>' :
-    vinculados.map(v => {
-      const custo = v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
-      return '<div class="combo-item-row"><label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;flex:1"><input type="checkbox" style="width:15px;height:15px" '+(v.toma_credito?'checked':'')+' onchange="toggleCreditoInsumoProduto(\''+v.id+'\', this.checked)"><span>'+v.quantidade+'× '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+' <span style="color:var(--text-light);font-size:.72rem">(toma crédito)</span></span></label><button class="rm" onclick="removerInsumoProduto(\''+v.id+'\')">🗑️</button></div>';
-    }).join('');
-  atualizarPreviaComposicao();
-}
-
-async function toggleCreditoInsumoProduto(vinculoId, valor){
-  const { error } = await sb.from('precificacao_produto_insumos').update({ toma_credito: valor }).eq('id', vinculoId);
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarInsumosDoProduto(window.__produtoInsumosAtual);
-}
-
-async function adicionarInsumoProduto(){
-  const insumoId = $('pdAddInsumo').value;
-  const qtd = Number($('pdAddInsumoQtd').value) || 1;
-  if(!insumoId || !window.__produtoInsumosAtual) return;
-  const { error } = await sb.from('precificacao_produto_insumos').upsert(
-    { produto_id: window.__produtoInsumosAtual, insumo_id: insumoId, quantidade: qtd },
-    { onConflict: 'produto_id,insumo_id' }
-  );
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarInsumosDoProduto(window.__produtoInsumosAtual);
-}
-
-async function removerInsumoProduto(vinculoId){
-  const { error } = await sb.from('precificacao_produto_insumos').delete().eq('id', vinculoId);
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarInsumosDoProduto(window.__produtoInsumosAtual);
-}
-
-// ── mesma coisa, só que embutida no modal de Novo Custo/Preço ──
-async function carregarInsumosNoPreco(produtoId){
-  const [{ data: vinculados }, { data: todosInsumos }] = await Promise.all([
-    sb.from('precificacao_produto_insumos').select('*, precificacao_insumos(nome, custo_unitario, unidade)').eq('produto_id', produtoId),
-    sb.from('precificacao_insumos').select('*').eq('ativo', true).order('nome'),
-  ]);
-  window.__pcInsumosVinculados = vinculados || [];
-  window.__pcProdutoAtual = produtoId;
-
-  $('pcAddInsumo').innerHTML = (todosInsumos||[]).map(i => '<option value="'+i.id+'">'+esc(i.nome)+' ('+fmtMoeda(i.custo_unitario)+'/'+esc(i.unidade||'un')+')</option>').join('');
-  renderInsumosNoPrecoLista();
-}
-
-function renderInsumosNoPrecoLista(){
-  const vinculados = window.__pcInsumosVinculados || [];
-  let total = 0;
-  $('pcInsumosLista').innerHTML = !vinculados.length ? '<p class="hint">Nenhum componente vinculado ainda.</p>' :
-    vinculados.map(v => {
-      const custo = v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
-      total += custo;
-      return '<div class="combo-item-row"><label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;flex:1"><input type="checkbox" style="width:15px;height:15px" '+(v.toma_credito?'checked':'')+' onchange="toggleCreditoInsumoNoPreco(\''+v.id+'\', this.checked)"><span>'+v.quantidade+' '+esc(v.precificacao_insumos?v.precificacao_insumos.unidade:'')+' de '+esc(v.precificacao_insumos?v.precificacao_insumos.nome:'?')+' — '+fmtMoeda(custo)+' <span style="color:var(--text-light);font-size:.72rem">(toma crédito)</span></span></label><button class="rm" onclick="removerInsumoNoPreco(\''+v.id+'\')">🗑️</button></div>';
-    }).join('');
-
-  $('pcComposicaoResumo').innerHTML = vinculados.length
-    ? '<strong>Total da composição: '+fmtMoeda(total)+'</strong> &nbsp;<button type="button" class="btn-outline btn btn-sm" onclick="usarComposicaoComoCusto('+total+')">Usar este valor no Custo</button>'
-    : '';
-  atualizarMargensModal();
-}
-
-async function toggleCreditoInsumoNoPreco(vinculoId, valor){
-  const { error } = await sb.from('precificacao_produto_insumos').update({ toma_credito: valor }).eq('id', vinculoId);
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarInsumosNoPreco(window.__pcProdutoAtual);
-}
-
-async function adicionarInsumoNoPreco(){
-  const insumoId = $('pcAddInsumo').value;
-  const qtd = Number($('pcAddInsumoQtd').value) || 1;
-  if(!insumoId || !window.__pcProdutoAtual) return;
-  const { error } = await sb.from('precificacao_produto_insumos').upsert(
-    { produto_id: window.__pcProdutoAtual, insumo_id: insumoId, quantidade: qtd },
-    { onConflict: 'produto_id,insumo_id' }
-  );
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarInsumosNoPreco(window.__pcProdutoAtual);
-}
-
-async function removerInsumoNoPreco(vinculoId){
-  const { error } = await sb.from('precificacao_produto_insumos').delete().eq('id', vinculoId);
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarInsumosNoPreco(window.__pcProdutoAtual);
-}
-
-function usarComposicaoComoCusto(total){
-  $('pcCusto').value = Number(total).toFixed(2);
-  atualizarMargensModal();
-}
-
-// ── INSUMOS (catálogo) ─────────────────────────────────────
-let insumoEditandoId = null;
-let insumosCache = [];
-
-async function renderInsumos(){
-  const el = $('mainContent');
-  el.innerHTML =
-    '<div class="card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
-        '<h2 style="margin:0">Insumos</h2>'+
-        '<button class="btn" onclick="abrirNovoInsumo()">+ Novo Insumo</button>'+
-      '</div>'+
-      '<p class="hint">Embalagem e outros itens que compõem o custo de um produto (ex: cinta, pote de isopor). Vincule a um produto editando-o na aba Produtos.</p>'+
-      '<div id="insumosTabela" class="loading">Carregando…</div>'+
-    '</div>';
-  await carregarInsumos();
-}
-
-async function carregarInsumos(){
-  const { data, error } = await sb.from('precificacao_insumos').select('*').order('nome');
-  if(error){ $('insumosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
-  insumosCache = data || [];
-  if(!insumosCache.length){ $('insumosTabela').innerHTML = '<div class="empty">Nenhum insumo cadastrado ainda.</div>'; return; }
-
-  $('insumosTabela').innerHTML =
-    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Custo unitário</th><th>Unidade</th><th>Status</th><th></th></tr></thead><tbody>'+
-      insumosCache.map(i => (
-        '<tr class="'+(i.ativo?'':'inativo')+'">'+
-          '<td>'+esc(i.nome)+(i.automatico?' <span class="badge badge-tipo">🔄 Automático</span>':'')+'</td>'+
-          '<td>'+fmtMoeda(i.custo_unitario)+'</td>'+
-          '<td>'+esc(i.unidade||'—')+'</td>'+
-          '<td>'+(i.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
-          '<td style="white-space:nowrap">'+
-            '<button class="btn-outline btn btn-sm" onclick="abrirEditarInsumo(\''+i.id+'\')">Editar</button> '+
-            (i.automatico ? '' : '<button class="btn-danger" onclick="toggleAtivoInsumo(\''+i.id+'\','+(!i.ativo)+')">'+(i.ativo?'Desativar':'Reativar')+'</button> ')+
-            (souMaster && !i.automatico ? '<button class="btn-danger" onclick="excluirInsumo(\''+i.id+'\')">🗑️</button>' : '')+
-          '</td>'+
-        '</tr>'
-      )).join('')+
-    '</tbody></table></div>';
-}
-
-function atualizarLabelCalculadora(){
-  const un = $('inUnidade').value.trim() || 'unidade';
-  $('inCalcRendimentoLabel').textContent = 'Rende quantos '+un+' (na unidade acima)';
-}
-
-function calcularCustoUnitarioInsumo(){
-  const preco = Number($('inCalcPreco').value);
-  const rendimento = Number($('inCalcRendimento').value);
-  if(!(preco>0) || !(rendimento>0)){ alert('Preencha o preço pago e o rendimento (ambos maiores que zero).'); return; }
-  $('inCusto').value = (preco/rendimento).toFixed(4);
-}
-
-function abrirNovoInsumo(){
-  insumoEditandoId = null;
-  $('tituloInsumo').textContent = 'Novo Insumo';
-  $('inNome').value=''; $('inCusto').value=''; $('inUnidade').value='un';
-  $('inCalcPreco').value=''; $('inCalcRendimento').value='';
-  atualizarLabelCalculadora();
-  $('inNome').disabled = $('inCusto').disabled = $('inUnidade').disabled = false;
-  $('inAtivoWrap').style.display = 'none';
-  showMsg('insumoMsg','','');
-  $('modalInsumo').classList.add('show');
-}
-
-function abrirEditarInsumo(id){
-  const i = insumosCache.find(x => x.id === id);
-  if(!i) return;
-  insumoEditandoId = id;
-  $('tituloInsumo').textContent = 'Editar Insumo';
-  $('inNome').value = i.nome; $('inCusto').value = i.custo_unitario; $('inUnidade').value = i.unidade || '';
-  $('inCalcPreco').value=''; $('inCalcRendimento').value='';
-  atualizarLabelCalculadora();
-  $('inNome').disabled = $('inCusto').disabled = $('inUnidade').disabled = !!i.automatico;
-  $('inAtivoWrap').style.display = 'flex'; $('inAtivo').checked = !!i.ativo;
-  showMsg('insumoMsg', i.automatico ? 'Esse insumo é atualizado automaticamente pela média ponderada do gelato — não dá pra editar nome, custo ou unidade aqui.' : '', i.automatico ? '' : '');
-  $('modalInsumo').classList.add('show');
-}
-
-async function salvarInsumo(){
-  const jaExistente = insumoEditandoId ? insumosCache.find(x => x.id === insumoEditandoId) : null;
-  if(jaExistente && jaExistente.automatico){
-    const { error } = await sb.from('precificacao_insumos').update({ ativo: $('inAtivo').checked }).eq('id', insumoEditandoId);
-    if(error){ showMsg('insumoMsg','Erro: '+error.message,'err'); return; }
-    fecharModal('modalInsumo');
-    renderInsumos();
+  if(!produtos.length){
+    wrap.innerHTML = '<div class="empty">Nenhum produto ativo cadastrado na Precificação.</div>';
     return;
   }
-
-  const nome = $('inNome').value.trim();
-  const custo_unitario = Number($('inCusto').value);
-  const unidade = $('inUnidade').value.trim() || null;
-  if(!nome){ showMsg('insumoMsg','Dá um nome pro insumo.','err'); return; }
-  if(!(custo_unitario>=0)){ showMsg('insumoMsg','Informe um custo válido.','err'); return; }
-
-  const payload = { nome, custo_unitario, unidade, atualizado_em: new Date().toISOString() };
-  if(insumoEditandoId) payload.ativo = $('inAtivo').checked;
-
-  const btn = $('btnSalvarInsumo');
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  let error;
-  if(insumoEditandoId){
-    ({ error } = await sb.from('precificacao_insumos').update(payload).eq('id', insumoEditandoId));
-  } else {
-    ({ error } = await sb.from('precificacao_insumos').insert({ ...payload, empresa: 'loja', criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome }));
-  }
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(error){ showMsg('insumoMsg','Erro: '+error.message,'err'); return; }
-  fecharModal('modalInsumo');
-  renderInsumos();
-}
-
-async function toggleAtivoInsumo(id, novoValor){
-  const { error } = await sb.from('precificacao_insumos').update({ ativo: novoValor }).eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  renderInsumos();
-}
-
-async function excluirInsumo(id){
-  const i = insumosCache.find(x => x.id === id);
-  if(i && i.automatico){ alert('Esse insumo é gerenciado automaticamente e não pode ser excluído.'); return; }
-  if(!confirm('Excluir este insumo? Se ele estiver vinculado a algum produto, o vínculo some junto.')) return;
-  const { error } = await sb.from('precificacao_insumos').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  renderInsumos();
-}
-
-// ── TRIBUTOS ───────────────────────────────────────────────
-let tributoEditandoId = null;
-let tributosCache = [];
-
-async function renderTributos(){
-  const el = $('mainContent');
-  el.innerHTML =
-    '<div class="card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
-        '<h2 style="margin:0">Tributos</h2>'+
-        '<button class="btn" onclick="abrirNovoTributo()">+ Novo Tributo</button>'+
-      '</div>'+
-      '<p class="hint">Um tributo é sempre um par (elo, categoria). '+(souMaster ? 'Como master, o que você cadastra já entra aprovado.' : 'O que você cadastrar ou editar aqui entra como pendente até o master aprovar — só depois fica disponível pra aplicar num preço.')+'</p>'+
-      '<div id="tributosTabela" class="loading">Carregando…</div>'+
-    '</div>';
-  await carregarTributos();
-}
-
-async function carregarTributos(){
-  const { data, error } = await sb.from('precificacao_tributos').select('*').order('elo').order('categoria').order('vigencia_inicio', { ascending:false });
-  if(error){ $('tributosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
-  tributosCache = data || [];
-  if(!tributosCache.length){ $('tributosTabela').innerHTML = '<div class="empty">Nenhum tributo cadastrado ainda.</div>'; return; }
-
-  $('tributosTabela').innerHTML =
-    '<div class="table-wrap"><table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Créd. Compra</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+
-      tributosCache.map(t => {
-        const podeEditar = souMaster || (souBackofficePrecificacao && t.status !== 'aprovado');
-        const podeExcluir = souMaster;
-        const statusLabel = t.status==='aprovado'?'Aprovado':t.status==='pendente'?'Pendente':'Rejeitado';
-        return '<tr>'+
-          '<td><span class="badge badge-tipo">'+ELO_LABEL[t.elo]+'</span></td>'+
-          '<td>'+esc(t.categoria)+'</td>'+
-          '<td>'+esc(t.tipo_tributo)+'</td>'+
-          '<td>'+fmtPct(t.aliquota)+'</td>'+
-          '<td>'+(Number(t.aliquota_credito)>0 ? fmtPct(t.aliquota_credito) : '—')+'</td>'+
-          '<td>'+fmtData(t.vigencia_inicio)+'</td>'+
-          '<td><span class="badge badge-'+t.status+'">'+statusLabel+'</span></td>'+
-          '<td style="white-space:nowrap">'+
-            (podeEditar ? '<button class="btn-outline btn btn-sm" onclick="abrirEditarTributo(\''+t.id+'\')">Editar</button> ' : '')+
-            (podeExcluir ? '<button class="btn-danger" onclick="excluirTributo(\''+t.id+'\')">🗑️</button>' : '')+
-          '</td>'+
-        '</tr>';
-      }).join('')+
-    '</tbody></table></div>';
-}
-
-function abrirNovoTributo(){
-  tributoEditandoId = null;
-  $('tituloTributo').textContent = 'Novo Tributo';
-  $('trElo').value='fabrica_loja'; $('trCategoria').value=''; $('trTipo').value=''; $('trAliquota').value=''; $('trAliquotaCredito').value=''; $('trVigencia').value=hojeISO();
-  showMsg('tributoMsg','','');
-  $('modalTributo').classList.add('show');
-}
-
-function abrirEditarTributo(id){
-  const t = tributosCache.find(x => x.id === id);
-  if(!t) return;
-  tributoEditandoId = id;
-  $('tituloTributo').textContent = 'Editar Tributo';
-  $('trElo').value = t.elo; $('trCategoria').value = t.categoria; $('trTipo').value = t.tipo_tributo;
-  $('trAliquota').value = t.aliquota; $('trAliquotaCredito').value = t.aliquota_credito || 0; $('trVigencia').value = t.vigencia_inicio;
-  showMsg('tributoMsg','','');
-  $('modalTributo').classList.add('show');
-}
-
-async function salvarTributo(){
-  const elo = $('trElo').value;
-  const categoria = $('trCategoria').value.trim();
-  const tipo_tributo = $('trTipo').value.trim();
-  const aliquota = Number($('trAliquota').value);
-  const aliquota_credito = Number($('trAliquotaCredito').value) || 0;
-  const vigencia_inicio = $('trVigencia').value;
-  if(!categoria || !tipo_tributo){ showMsg('tributoMsg','Preencha categoria e tipo de tributo.','err'); return; }
-  if(!vigencia_inicio){ showMsg('tributoMsg','Informe a vigência.','err'); return; }
-
-  const payload = { elo, categoria, tipo_tributo, aliquota, aliquota_credito, vigencia_inicio };
-  const btn = $('btnSalvarTributo');
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  let error;
-  if(tributoEditandoId){
-    ({ error } = await sb.from('precificacao_tributos').update(payload).eq('id', tributoEditandoId));
-  } else {
-    ({ error } = await sb.from('precificacao_tributos').insert(payload));
-  }
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(error){ showMsg('tributoMsg','Erro: '+error.message,'err'); return; }
-  fecharModal('modalTributo');
-  renderTributos();
-  atualizarBadgePendentes();
-}
-
-async function excluirTributo(id){
-  if(!confirm('Excluir este tributo? Preços que já o referenciam mantêm o histórico, só a referência fica órfã.')) return;
-  const { error } = await sb.from('precificacao_tributos').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  renderTributos();
-}
-
-// ── PREÇOS ─────────────────────────────────────────────────
-let precoEditandoId = null;
-let produtoSelecionadoPrecos = null;
-let precosCache = [];
-let precosEloAtual = 'loja_consumidor';
-
-const PRECOS_ELO_TABS = [
-  { elo: 'loja_consumidor', label: '🛍️ Loja → Consumidor' },
-  { elo: 'loja_delivery', label: '🛵 Loja → Delivery' },
-];
-
-function precoVigenteDe(todosPrecos, produtoId, elo){
-  const hoje = hojeISO();
-  const rows = todosPrecos.filter(r => r.produto_id===produtoId && r.elo===elo && r.vigencia_inicio<=hoje && r.status==='aprovado');
-  if(!rows.length) return null;
-  return rows.sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio))[0];
-}
-
-function mudarPrecosElo(elo){
-  precosEloAtual = elo;
-  renderPrecos();
-}
-
-async function renderPrecos(){
-  const el = $('mainContent');
-  el.innerHTML = '<div class="loading">Carregando…</div>';
-
-  const subnav = '<div class="subnav">'+PRECOS_ELO_TABS.map(t =>
-    '<div class="subnav-item'+(t.elo===precosEloAtual?' active':'')+'" onclick="mudarPrecosElo(\''+t.elo+'\')">'+t.label+'</div>'
-  ).join('')+'</div>';
-
-  try {
-    const [prodR, precoR] = await Promise.all([
-      sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
-      sb.from('precificacao_precos').select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)'),
-    ]);
-    if(prodR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro: '+esc(prodR.error.message)+'</div></div>'; return; }
-    if(precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro: '+esc(precoR.error.message)+'</div></div>'; return; }
-
-    const produtos = prodR.data || [];
-    const todosPrecos = precoR.data || [];
-    window.__produtosAtivosCache = produtos;
-    window.__todosPrecosCache = todosPrecos;
-
-    const produtosFiltrados = produtos.filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(precosEloAtual));
-
-    if(!produtosFiltrados.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum produto ativo com esse elo ainda.</div></div>'; return; }
-
-    const porCategoria = {};
-    produtosFiltrados.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
-    const categorias = Object.keys(porCategoria).sort();
-
-    el.innerHTML = subnav + categorias.map(cat => {
-      const linhas = porCategoria[cat].map(p => {
-        const row = precoVigenteDe(todosPrecos, p.id, precosEloAtual);
-        const aliquotaD = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
-        const aliquotaC = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
-        const m = row ? calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC) : null;
-        return '<tr>'+
-          '<td>'+esc(p.nome)+'</td>'+
-          '<td>'+(row?fmtMoeda(row.custo):'—')+'</td>'+
-          '<td>'+(row?fmtMoeda(row.preco_venda):'—')+'</td>'+
-          (m ? '<td class="mc-cell"><span class="r'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'</span><span class="p">'+fmtPct(m.mcBrutaPct)+'</span></td>' : '<td>—</td>')+
-          (m ? '<td class="mc-cell"><span class="r'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'</span><span class="p">'+fmtPct(m.mcLiquidaPct)+'</span></td>' : '<td>—</td>')+
-          '<td>'+(row?fmtData(row.vigencia_inicio):'—')+'</td>'+
-          '<td style="white-space:nowrap">'+
-            '<button class="btn-outline btn btn-sm" onclick="abrirNovoValor(\''+p.id+'\',\''+precosEloAtual+'\',\'custo\')">+ Custo</button> '+
-            '<button class="btn-outline btn btn-sm" onclick="abrirNovoValor(\''+p.id+'\',\''+precosEloAtual+'\',\'preco\')">+ Preço</button> '+
-            '<button class="btn-outline btn btn-sm" onclick="abrirHistoricoPreco(\''+p.id+'\')">Histórico</button>'+
-          '</td>'+
-        '</tr>';
-      }).join('');
-      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço Venda</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigente desde</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div></div>';
-    }).join('');
-  } catch(err) {
-    el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar: '+esc(err.message||String(err))+'</div></div>';
-  }
-}
-
-async function abrirHistoricoPreco(produtoId){
-  produtoSelecionadoPrecos = (window.__produtosAtivosCache||[]).find(p => p.id === produtoId) || null;
-  if(!produtoSelecionadoPrecos) return;
-  $('tituloHistorico').textContent = 'Histórico — '+produtoSelecionadoPrecos.nome;
-  $('historicoFiltro').value = '';
-  $('historicoConteudo').innerHTML = '<div class="loading">Carregando…</div>';
-  $('modalHistorico').classList.add('show');
-  await carregarHistoricoPreco();
-}
-
-async function carregarHistoricoPreco(){
-  const { data, error } = await sb.from('precificacao_precos')
-    .select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)')
-    .eq('produto_id', produtoSelecionadoPrecos.id)
-    .order('elo').order('vigencia_inicio', { ascending:false });
-  if(error){ $('historicoConteudo').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
-  precosCache = data || [];
-  renderHistoricoTabela();
-}
-
-function renderHistoricoTabela(){
-  const filtro = ($('historicoFiltro').value || '').toLowerCase().trim();
-  const hoje = hojeISO();
-
-  const linhasInfo = precosCache.map(row => {
-    let status, statusLabel;
-    if(row.status === 'pendente'){ status = 'pendente'; statusLabel = 'Pendente aprovação'; }
-    else if(row.status === 'rejeitado'){ status = 'rejeitado'; statusLabel = 'Rejeitado'; }
-    else {
-      const mesmoEloAprovados = precosCache.filter(r => r.elo === row.elo && r.status === 'aprovado' && r.vigencia_inicio <= hoje)
-        .sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio));
-      const atual = mesmoEloAprovados[0];
-      if(row.vigencia_inicio > hoje){ status = 'agendado'; statusLabel = 'Agendado'; }
-      else if(atual && atual.id === row.id){ status = 'vigente'; statusLabel = 'Vigente'; }
-      else { status = 'historico'; statusLabel = 'Histórico'; }
-    }
-
-    const podeEditar = souMaster || (souBackofficePrecificacao && row.status !== 'aprovado' && row.vigencia_inicio >= hoje);
-    const podeExcluir = souMaster;
-    const aliquotaD = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
-    const aliquotaC = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
-    const m = calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC);
-    const tributoTxt = row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+(aliquotaC>0?', créd. '+fmtPct(aliquotaC):'')+')' : '—';
-    const statusBadge = '<span class="badge badge-'+status+'">'+statusLabel+'</span>';
-
-    const searchText = (ELO_LABEL[row.elo]+' '+(row.precificacao_tributos?row.precificacao_tributos.tipo_tributo:'')+' '+fmtData(row.vigencia_inicio)+' '+row.vigencia_inicio+' '+statusLabel).toLowerCase();
-
-    const html = '<tr>'+
-      '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
-      '<td>'+fmtMoeda(row.custo)+'</td>'+
-      '<td>'+fmtMoeda(row.preco_venda)+'</td>'+
-      '<td>'+tributoTxt+'</td>'+
-      '<td class="mc-cell"><span class="r'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'</span><span class="p">'+fmtPct(m.mcBrutaPct)+'</span></td>'+
-      '<td class="mc-cell"><span class="r'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'</span><span class="p">'+fmtPct(m.mcLiquidaPct)+'</span></td>'+
-      '<td>'+fmtData(row.vigencia_inicio)+'</td>'+
-      '<td>'+statusBadge+'</td>'+
-      '<td style="white-space:nowrap">'+
-        (podeEditar ? '<button class="btn-outline btn btn-sm" onclick="abrirEditarPreco(\''+row.id+'\')">Editar</button> ' : '')+
-        (podeExcluir ? '<button class="btn-danger" onclick="excluirPreco(\''+row.id+'\')">🗑️</button>' : '')+
-      '</td>'+
-    '</tr>';
-    return { html, searchText };
-  });
-
-  const filtradas = filtro ? linhasInfo.filter(l => l.searchText.includes(filtro)) : linhasInfo;
-
-  if(!precosCache.length){ $('historicoConteudo').innerHTML = '<div class="empty">Nenhum preço cadastrado ainda pra este produto.</div>'; return; }
-  if(!filtradas.length){ $('historicoConteudo').innerHTML = '<div class="empty">Nenhum registro encontrado pra essa busca.</div>'; return; }
-
-  $('historicoConteudo').innerHTML =
-    '<div style="overflow-x:auto"><table><thead><tr><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Tributo</th><th>MC Bruta</th><th>MC Líquida</th><th>Vigência desde</th><th>Status</th><th></th></tr></thead><tbody>'+
-      filtradas.map(l => l.html).join('')+
-    '</tbody></table></div>';
-}
-
-
-async function popularTributosCheckboxDoElo(elo, selecionadosIds){
-  selecionadosIds = selecionadosIds || [];
-  const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', elo);
-  const wrap = $('pcTributosLista');
-  if(error){ wrap.innerHTML = '<p class="hint">Erro ao carregar impostos.</p>'; atualizarMargensModal(); return; }
-  const lista = (data||[]).filter(t => t.status === 'aprovado' || selecionadosIds.includes(t.id)).sort((a,b) => a.categoria.localeCompare(b.categoria));
-  wrap.innerHTML = !lista.length ? '<p class="hint">Nenhum imposto cadastrado pra esse elo ainda.</p>' :
-    lista.map(t => (
-      '<label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;font-size:.85rem">'+
-        '<input type="checkbox" class="pc-tributo-check" value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(selecionadosIds.includes(t.id)?' checked':'')+' onchange="atualizarMargensModal()" style="width:16px;height:16px">'+
-        esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+(t.status!=='aprovado'?' — '+t.status:'')+')'+
-      '</label>'
-    )).join('');
-  atualizarMargensModal();
-}
-
-function atualizarTributosDoModalPreco(){
-  popularTributosCheckboxDoElo($('pcElo').value, []);
-}
-
-async function calcularCustoComposicao(produtoId){
-  const { data: vinculados } = await sb.from('precificacao_produto_insumos')
-    .select('quantidade, precificacao_insumos(custo_unitario)').eq('produto_id', produtoId);
-  let total = 0;
-  (vinculados||[]).forEach(v => { total += v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0); });
-  return total;
-}
-
-async function abrirNovoValor(produtoId, elo, foco){
-  produtoSelecionadoPrecos = (window.__produtosAtivosCache||[]).find(p => p.id === produtoId) || null;
-  if(!produtoSelecionadoPrecos) return;
-  precoEditandoId = null;
-
-  const titulos = { custo:'Novo Custo', preco:'Novo Preço' };
-  $('tituloPreco').textContent = titulos[foco] || 'Novo Preço e Custo';
-  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+ELO_LABEL[elo];
-
-  const elos = ELOS_POR_ORIGEM[produtoSelecionadoPrecos.origem];
-  $('pcElo').innerHTML = elos.map(e => '<option value="'+e+'">'+ELO_LABEL[e]+'</option>').join('');
-  $('pcElo').disabled = false;
-  if(elos.includes(elo)) $('pcElo').value = elo;
-
-  const vigente = precoVigenteDe(window.__todosPrecosCache||[], produtoId, elo);
-  const sugestao = await calcularCustoComposicao(produtoId);
-
-  $('pcCusto').value = vigente ? vigente.custo : (sugestao > 0 ? sugestao.toFixed(2) : '');
-  $('pcPrecoVenda').value = vigente ? vigente.preco_venda : '';
-  $('pcVigencia').value = hojeISO();
-  $('pcCustoTomaCredito').checked = vigente ? (vigente.custo_toma_credito !== false) : true;
-  const tributosSelecionados = vigente ? (await sb.from('precificacao_preco_tributos').select('tributo_id').eq('preco_id', vigente.id)).data || [] : [];
-  await popularTributosCheckboxDoElo($('pcElo').value, tributosSelecionados.map(t => t.tributo_id));
-
-  showMsg('precoMsg', sugestao > 0 ? ('Sugestão pela composição (veja abaixo): '+fmtMoeda(sugestao)) : '', '');
-  await carregarInsumosNoPreco(produtoId);
-  $('modalPreco').classList.add('show');
-  setTimeout(() => { const campo = foco==='preco' ? $('pcPrecoVenda') : $('pcCusto'); campo.focus(); campo.select(); }, 50);
-}
-
-function abrirNovoPreco(){
-  if(!produtoSelecionadoPrecos) return;
-  precoEditandoId = null;
-  $('tituloPreco').textContent = 'Novo Preço';
-  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+(ORIGEM_LABEL[produtoSelecionadoPrecos.origem]||produtoSelecionadoPrecos.origem);
-  const elos = ELOS_POR_ORIGEM[produtoSelecionadoPrecos.origem];
-  $('pcElo').innerHTML = elos.map(e => '<option value="'+e+'">'+ELO_LABEL[e]+'</option>').join('');
-  $('pcElo').disabled = false;
-  if(elos.includes(precosEloAtual)) $('pcElo').value = precosEloAtual;
-  $('pcCusto').value=''; $('pcPrecoVenda').value=''; $('pcVigencia').value=hojeISO();
-  $('pcCustoTomaCredito').checked = true;
-  popularTributosCheckboxDoElo($('pcElo').value, []);
-  showMsg('precoMsg','','');
-  carregarInsumosNoPreco(produtoSelecionadoPrecos.id);
-  $('modalPreco').classList.add('show');
-}
-
-async function abrirEditarPreco(id){
-  const row = precosCache.find(x => x.id === id);
-  if(!row) return;
-  precoEditandoId = id;
-  $('tituloPreco').textContent = 'Editar Preço';
-  $('pcProdutoNome').textContent = produtoSelecionadoPrecos.nome+' — '+ELO_LABEL[row.elo];
-  $('pcElo').innerHTML = '<option value="'+row.elo+'">'+ELO_LABEL[row.elo]+'</option>';
-  $('pcElo').disabled = true;
-  $('pcCusto').value = row.custo; $('pcPrecoVenda').value = row.preco_venda; $('pcVigencia').value = row.vigencia_inicio;
-  $('pcCustoTomaCredito').checked = row.custo_toma_credito !== false;
-  const { data: tribRow } = await sb.from('precificacao_preco_tributos').select('tributo_id').eq('preco_id', row.id);
-  await popularTributosCheckboxDoElo(row.elo, (tribRow||[]).map(t => t.tributo_id));
-  showMsg('precoMsg','','');
-  carregarInsumosNoPreco(produtoSelecionadoPrecos.id);
-  $('modalPreco').classList.add('show');
-}
-
-async function salvarPreco(){
-  const elo = $('pcElo').value;
-  const custo = Number($('pcCusto').value);
-  const preco_venda = Number($('pcPrecoVenda').value);
-  const custo_toma_credito = $('pcCustoTomaCredito').checked;
-  const tributosSelecionados = [...document.querySelectorAll('.pc-tributo-check:checked')].map(c => c.value);
-  const tributo_aplicado_id = tributosSelecionados[0] || null;
-  const vigencia_inicio = $('pcVigencia').value;
-  if(!vigencia_inicio){ showMsg('precoMsg','Informe a vigência.','err'); return; }
-  if(custo < 0 || preco_venda < 0){ showMsg('precoMsg','Custo e preço de venda precisam ser válidos.','err'); return; }
-
-  const btn = $('btnSalvarPreco');
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  let error, precoId;
-  if(precoEditandoId){
-    ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, custo_toma_credito, tributo_aplicado_id, vigencia_inicio }).eq('id', precoEditandoId));
-    precoId = precoEditandoId;
-  } else {
-    const { data: existente } = await sb.from('precificacao_precos').select('id, status')
-      .eq('produto_id', produtoSelecionadoPrecos.id).eq('elo', elo).eq('vigencia_inicio', vigencia_inicio).maybeSingle();
-
-    if(existente && existente.status === 'pendente'){
-      ({ error } = await sb.from('precificacao_precos').update({ custo, preco_venda, custo_toma_credito, tributo_aplicado_id }).eq('id', existente.id));
-      precoId = existente.id;
-    } else if(existente){
-      btn.disabled = false; btn.textContent = 'Salvar';
-      showMsg('precoMsg','Já existe um preço com essa vigência (status: '+existente.status+'). Escolha outra data, ou ajuste esse registro pela aba Aprovações/Histórico.','err');
-      return;
-    } else {
-      const { data: novo, error: errIns } = await sb.from('precificacao_precos').insert({
-        produto_id: produtoSelecionadoPrecos.id, elo, custo, preco_venda, custo_toma_credito, tributo_aplicado_id, vigencia_inicio,
-        criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
-      }).select('id').single();
-      error = errIns; precoId = novo ? novo.id : null;
-    }
-  }
-
-  if(!error && precoId){
-    await sb.from('precificacao_preco_tributos').delete().eq('preco_id', precoId);
-    if(tributosSelecionados.length){
-      await sb.from('precificacao_preco_tributos').insert(tributosSelecionados.map(tid => ({ preco_id: precoId, tributo_id: tid })));
-    }
-  }
-
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(error && error.code === '23505'){ showMsg('precoMsg','Já existe um preço com essa vigência pra esse produto/elo. Escolha outra data, ou dá um refresh na página (Ctrl+Shift+R) — pode ser cache de uma versão antiga.','err'); return; }
-  if(error){ showMsg('precoMsg','Erro: '+error.message,'err'); return; }
-  fecharModal('modalPreco');
-  await carregarHistoricoPreco();
-  if(currentTab==='precos') renderPrecos();
-  atualizarBadgePendentes();
-}
-
-async function excluirPreco(id){
-  if(!confirm('Excluir este registro de preço? Essa ação é permanente.')) return;
-  const { error } = await sb.from('precificacao_precos').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarHistoricoPreco();
-  if(currentTab==='precos') renderPrecos();
-}
-
-// ── COMBOS ─────────────────────────────────────────────────
-let combosCache = [];
-let comboItensAtual = [];
-let comboProdutosCache = [];
-let comboTodosPrecosCache = [];
-let comboSelecionado = null;
-let comboPrecosCache = [];
-
-// alerta: > 20% de desconto = vermelho; entre 15% (exclusive) e 20% (inclusive) = amarelo
-function calcularAlertaCombo(somaIndividual, precoCombo){
-  somaIndividual = Number(somaIndividual)||0;
-  precoCombo = Number(precoCombo)||0;
-  if(somaIndividual <= 0) return { descontoPct: 0, nivel: null };
-  const descontoPct = (somaIndividual - precoCombo) / somaIndividual * 100;
-  let nivel = null;
-  if(descontoPct > 20) nivel = 'vermelho';
-  else if(descontoPct > 15) nivel = 'amarelo';
-  return { descontoPct, nivel };
-}
-
-function margemHtml(custo, precoVenda){
-  custo = Number(custo)||0; precoVenda = Number(precoVenda)||0;
-  if(precoVenda <= 0) return '—';
-  const margemPct = (precoVenda - custo) / precoVenda * 100;
-  const cor = margemPct < 0 ? 'var(--bordo)' : (margemPct < 30 ? '#b8860b' : 'var(--verde,#2e7d32)');
-  return '<span style="color:'+cor+'">'+fmtPct(margemPct)+'</span>';
-}
-
-function atualizarMargemPrecoLive(id){
-  const custo = Number($('apCusto_'+id).value) || 0;
-  const preco = Number($('apPreco_'+id).value) || 0;
-  $('apMargem_'+id).innerHTML = margemHtml(custo, preco);
-}
-
-function badgeAlertaCombo(nivel, descontoPct){
-  if(nivel==='vermelho') return '<span class="alerta-desconto alerta-vermelho">🔴 '+fmtPct(descontoPct)+' abaixo da soma</span>';
-  if(nivel==='amarelo') return '<span class="alerta-desconto alerta-amarelo">🟡 '+fmtPct(descontoPct)+' abaixo da soma</span>';
-  return fmtPct(descontoPct)+' abaixo da soma';
-}
-
-function atualizarDescontoComboLive(id){
-  const input = $('apComboPreco_'+id);
-  const novoPreco = Number(input.value) || 0;
-  const soma = Number(input.dataset.soma) || 0;
-  const original = Number(input.dataset.original) || 0;
-
-  const alerta = calcularAlertaCombo(soma, novoPreco);
-  $('apComboDesconto_'+id).innerHTML = badgeAlertaCombo(alerta.nivel, alerta.descontoPct);
-
-  const diff = novoPreco - original;
-  const deltaEl = $('apComboDelta_'+id);
-  if(Math.abs(diff) < 0.005){
-    deltaEl.innerHTML = 'igual ao proposto';
-  } else if(diff > 0){
-    deltaEl.innerHTML = '<span style="color:var(--verde,#2e7d32)">▲ '+fmtMoeda(diff)+' a mais que o proposto — mais margem</span>';
-  } else {
-    deltaEl.innerHTML = '<span style="color:var(--bordo)">▼ '+fmtMoeda(Math.abs(diff))+' a menos que o proposto — menos margem</span>';
-  }
-}
-
-function precoVigenteEmLista(lista, produto_id, elo){
-  const hoje = hojeISO();
-  const rows = lista.filter(r => r.produto_id===produto_id && r.elo===elo && r.vigencia_inicio<=hoje);
-  if(!rows.length) return null;
-  return rows.sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio))[0];
-}
-
-async function renderCombos(){
-  const el = $('mainContent');
-  el.innerHTML = '<div class="loading">Carregando…</div>';
-
-  const [combosR, itensR, precosR, itemPrecosR] = await Promise.all([
-    sb.from('precificacao_combos').select('*').eq('ativo', true).order('nome'),
-    sb.from('precificacao_combo_itens').select('*, precificacao_produtos(nome)'),
-    sb.from('precificacao_combo_precos').select('*, precificacao_tributos(aliquota, aliquota_credito)').eq('status','aprovado'),
-    sb.from('precificacao_precos').select('*').eq('status','aprovado'),
-  ]);
-  if(combosR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro: '+esc(combosR.error.message)+'</div></div>'; return; }
-
-  combosCache = combosR.data || [];
-  const itens = itensR.data || [];
-  const precos = precosR.data || [];
-  const itemPrecos = itemPrecosR.data || [];
-  const hoje = hojeISO();
-
-  const header = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn" onclick="abrirNovoCombo()">+ Novo Combo/Promoção</button></div>';
-
-  if(!combosCache.length){ el.innerHTML = header+'<div class="card"><div class="empty">Nenhum combo ou promoção cadastrado ainda.</div></div>'; return; }
-
-  const cardDe = (combo) => {
-    const meusItens = itens.filter(i => i.combo_id === combo.id);
-    const meusPrecos = precos.filter(p => p.combo_id === combo.id && p.vigencia_inicio <= hoje && (!p.vigencia_fim || p.vigencia_fim >= hoje))
-      .sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
-    const precoVigente = meusPrecos[0] || null;
-
-    // detecta se existe um preço aprovado que já passou da validade (promoção expirada)
-    const todosPrecosDoCombo = precos.filter(p => p.combo_id === combo.id).sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
-    const ultimoExpirado = !precoVigente && todosPrecosDoCombo.find(p => p.vigencia_fim && p.vigencia_fim < hoje);
-
-    let somaIndividual = 0, custoTotal = 0;
-    meusItens.forEach(i => {
-      const pv = precoVigenteEmLista(itemPrecos, i.produto_id, i.elo);
-      if(pv){ somaIndividual += Number(pv.preco_venda) * i.quantidade; custoTotal += Number(pv.custo) * i.quantidade; }
-    });
-
-    const itensTxt = meusItens.map(i => '<span class="chip">'+i.quantidade+'× '+esc(i.precificacao_produtos?i.precificacao_produtos.nome:'?')+' ('+ELO_LABEL[i.elo]+')</span>').join('');
-
-    let mc = null, alerta = { descontoPct:0, nivel:null };
-    if(precoVigente){
-      const aliquotaD = precoVigente.precificacao_tributos ? Number(precoVigente.precificacao_tributos.aliquota) : 0;
-      const aliquotaC = precoVigente.precificacao_tributos ? Number(precoVigente.precificacao_tributos.aliquota_credito) : 0;
-      mc = calcularMargens(custoTotal, precoVigente.preco_combo, aliquotaD, aliquotaC);
-      alerta = calcularAlertaCombo(somaIndividual, precoVigente.preco_combo);
-    }
-
-    const badgeVigencia = combo.tipo === 'promocao'
-      ? (precoVigente
-          ? (precoVigente.vigencia_fim ? '<span class="badge badge-tipo">válida até '+fmtData(precoVigente.vigencia_fim)+'</span>' : '<span class="badge badge-tipo">sem data de fim</span>')
-          : (ultimoExpirado ? '<span class="badge" style="background:#f0dede;color:#B43C3C">expirada em '+fmtData(ultimoExpirado.vigencia_fim)+'</span>' : ''))
-      : '';
-
-    return '<div class="card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'+
-        '<h2 style="margin:0">'+esc(combo.nome)+' '+badgeVigencia+'</h2>'+
-        '<div style="white-space:nowrap">'+
-          '<button class="btn-outline btn btn-sm" onclick="abrirEditarCombo(\''+combo.id+'\')">✏️ Editar</button> '+
-          '<button class="btn-outline btn btn-sm" onclick="abrirHistoricoCombo(\''+combo.id+'\')">Histórico</button> '+
-          (souMaster ? '<button class="btn-danger" onclick="excluirCombo(\''+combo.id+'\')">🗑️</button>' : '')+
-        '</div>'+
-      '</div>'+
-      '<div style="margin-bottom:12px">'+(itensTxt||'<span class="hint">sem itens</span>')+'</div>'+
-      (precoVigente ?
-        '<div class="row" style="margin-bottom:0;gap:26px">'+
-          '<div class="margem-item"><div class="lbl">Preço</div><div class="val">'+fmtMoeda(precoVigente.preco_combo)+'</div></div>'+
-          '<div class="margem-item"><div class="lbl">Soma individual</div><div class="val">'+fmtMoeda(somaIndividual)+'</div></div>'+
-          (mc ? '<div class="margem-item"><div class="lbl">MC Líquida</div><div class="val'+(mc.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(mc.mcLiquidaR)+'<span class="pct">'+fmtPct(mc.mcLiquidaPct)+'</span></div></div>' : '')+
-          '<div class="margem-item"><div class="lbl">Desconto</div><div style="margin-top:2px">'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</div></div>'+
-        '</div>'
-        : '<div class="empty" style="padding:14px">Sem preço vigente'+(ultimoExpirado?' (a promoção anterior expirou)':'')+'</div>')+
-    '</div>';
-  };
-
-  const combosDe = combosCache.filter(c => c.tipo !== 'promocao');
-  const promosDe = combosCache.filter(c => c.tipo === 'promocao');
-
-  el.innerHTML = header +
-    '<h2 style="margin:0 0 8px">🎁 Combos</h2>' +
-    (combosDe.length ? combosDe.map(cardDe).join('') : '<div class="card"><div class="empty">Nenhum combo ainda.</div></div>') +
-    '<h2 style="margin:24px 0 8px">🏷️ Promoções</h2>' +
-    (promosDe.length ? promosDe.map(cardDe).join('') : '<div class="card"><div class="empty">Nenhuma promoção ainda.</div></div>');
-}
-
-function onTipoComboChange(){
-  const tipo = $('cbTipo').value;
-  $('cbVigenciaFimWrap').style.display = tipo === 'promocao' ? '' : 'none';
-  $('cbItensMinHint').textContent = tipo === 'promocao'
-    ? 'Promoção pode ter só 1 item, ou vários.'
-    : 'Combo precisa de pelo menos 2 itens.';
-}
-
-async function abrirNovoCombo(){
-  comboItensAtual = [];
-  $('tituloCombo').textContent = 'Novo Combo/Promoção';
-  $('cbTipo').value = 'combo';
-  $('cbNome').value = '';
-  $('cbPreco').value = '';
-  $('cbVigencia').value = hojeISO();
-  $('cbVigenciaFim').value = '';
-  onTipoComboChange();
-  showMsg('comboMsg','','');
-
-  const [{ data: produtos }, { data: precos }, { data: tributos }] = await Promise.all([
-    sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
-    sb.from('precificacao_precos').select('*').eq('status','aprovado'),
-    sb.from('precificacao_tributos').select('*').eq('status','aprovado').order('elo').order('categoria'),
-  ]);
-  comboProdutosCache = produtos || [];
-  comboTodosPrecosCache = precos || [];
-
-  $('cbAddProduto').innerHTML = comboProdutosCache.map(p => '<option value="'+p.id+'">'+esc(p.nome)+' ('+esc(p.categoria)+')</option>').join('');
-  onProdutoComboChange();
-  renderComboItensLista();
-
-  $('cbTributo').innerHTML = '<option value="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
-    (tributos||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'">'+ELO_LABEL[t.elo]+' — '+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
-
-  atualizarResumoCombo();
-  $('modalCombo').classList.add('show');
-}
-
-function onProdutoComboChange(){
-  const produtoId = $('cbAddProduto').value;
-  const p = comboProdutosCache.find(x => x.id === produtoId);
-  const elos = p ? (ELOS_POR_ORIGEM[p.origem]||[]) : [];
-  $('cbAddElo').innerHTML = elos.map(e => '<option value="'+e+'">'+ELO_LABEL[e]+'</option>').join('');
-}
-
-function adicionarItemCombo(){
-  const produtoId = $('cbAddProduto').value;
-  const elo = $('cbAddElo').value;
-  const qtd = Math.max(1, parseInt($('cbAddQtd').value, 10) || 1);
-  const p = comboProdutosCache.find(x => x.id === produtoId);
-  if(!p || !elo) return;
-  const pv = precoVigenteEmLista(comboTodosPrecosCache, produtoId, elo);
-  comboItensAtual.push({ produto_id: produtoId, nome: p.nome, elo, quantidade: qtd, custo: pv?Number(pv.custo):0, preco_venda: pv?Number(pv.preco_venda):0, semPreco: !pv });
-  renderComboItensLista();
-  atualizarResumoCombo();
-}
-
-function removerItemCombo(idx){
-  comboItensAtual.splice(idx, 1);
-  renderComboItensLista();
-  atualizarResumoCombo();
-}
-
-function renderComboItensLista(){
-  $('cbItensLista').innerHTML = comboItensAtual.length ? comboItensAtual.map((it, idx) =>
-    '<div class="combo-item-row"><span>'+it.quantidade+'× '+esc(it.nome)+' ('+ELO_LABEL[it.elo]+')'+
-      (it.semPreco ? ' — <span style="color:#B43C3C">sem preço vigente</span>' : ' — '+fmtMoeda(it.preco_venda)+' cada')+
-    '</span><button class="rm" onclick="removerItemCombo('+idx+')">🗑️</button></div>'
-  ).join('') : '<p class="hint">Nenhum item adicionado ainda.</p>';
-}
-
-function atualizarResumoCombo(){
-  const grid = $('cbResumoGrid');
-  if(!grid) return;
-  let soma = 0, custo = 0;
-  comboItensAtual.forEach(it => { soma += it.preco_venda * it.quantidade; custo += it.custo * it.quantidade; });
-  const precoCombo = Number($('cbPreco').value)||0;
-  const sel = $('cbTributo');
-  const opt = sel ? sel.options[sel.selectedIndex] : null;
-  const aliquotaD = opt ? Number(opt.dataset.aliquota||0) : 0;
-  const aliquotaC = opt ? Number(opt.dataset.aliquotaCredito||0) : 0;
-  const m = calcularMargens(custo, precoCombo, aliquotaD, aliquotaC);
-  const alerta = calcularAlertaCombo(soma, precoCombo);
-  grid.innerHTML =
-    '<div class="margem-item"><div class="lbl">Soma dos itens individuais</div><div class="val">'+fmtMoeda(soma)+'</div></div>'+
-    '<div class="margem-item"><div class="lbl">Desconto do combo</div><div style="margin-top:2px">'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</div></div>'+
-    '<div class="margem-item"><div class="lbl">MC Bruta</div><div class="val'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'<span class="pct">'+fmtPct(m.mcBrutaPct)+'</span></div></div>'+
-    '<div class="margem-item"><div class="lbl">MC Líquida</div><div class="val'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'<span class="pct">'+fmtPct(m.mcLiquidaPct)+'</span></div></div>';
-}
-
-async function salvarNovoCombo(){
-  const nome = $('cbNome').value.trim();
-  const tipo = $('cbTipo').value;
-  const preco_combo = Number($('cbPreco').value);
-  const vigencia_inicio = $('cbVigencia').value;
-  const vigencia_fim = tipo === 'promocao' ? ($('cbVigenciaFim').value || null) : null;
-  const tributo_aplicado_id = $('cbTributo').value || null;
-  if(!nome){ showMsg('comboMsg','Dá um nome.','err'); return; }
-  const minimo = tipo === 'promocao' ? 1 : 2;
-  if(comboItensAtual.length < minimo){ showMsg('comboMsg', tipo==='promocao' ? 'Uma promoção precisa de pelo menos 1 item.' : 'Um combo precisa de pelo menos 2 itens.', 'err'); return; }
-  if(!vigencia_inicio || !(preco_combo>=0)){ showMsg('comboMsg','Preencha vigência e um preço válido.','err'); return; }
-  if(tipo === 'promocao' && !vigencia_fim){ showMsg('comboMsg','Promoção precisa de uma data de fim.','err'); return; }
-  if(vigencia_fim && vigencia_fim < vigencia_inicio){ showMsg('comboMsg','A vigência até não pode ser antes da vigência a partir de.','err'); return; }
-
-  const btn = $('btnSalvarCombo');
-  btn.disabled = true; btn.textContent = 'Salvando…';
-
-  const { data: combo, error: e1 } = await sb.from('precificacao_combos')
-    .insert({ nome, tipo, criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome }).select().single();
-  if(e1){ btn.disabled=false; btn.textContent='Salvar'; showMsg('comboMsg','Erro: '+e1.message,'err'); return; }
-
-  const itensPayload = comboItensAtual.map(it => ({ combo_id: combo.id, produto_id: it.produto_id, elo: it.elo, quantidade: it.quantidade }));
-  const { error: e2 } = await sb.from('precificacao_combo_itens').insert(itensPayload);
-  if(e2){ btn.disabled=false; btn.textContent='Salvar'; showMsg('comboMsg','Erro nos itens: '+e2.message,'err'); return; }
-
-  const { error: e3 } = await sb.from('precificacao_combo_precos').insert({
-    combo_id: combo.id, preco_combo, tributo_aplicado_id, vigencia_inicio, vigencia_fim,
-    criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
-  });
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(e3){ showMsg('comboMsg','Erro no preço: '+e3.message,'err'); return; }
-
-  fecharModal('modalCombo');
-  renderCombos();
-  atualizarBadgePendentes();
-}
-
-async function excluirCombo(id){
-  if(!confirm('Excluir este combo (itens e histórico de preço junto)? Essa ação é permanente.')) return;
-  const { error } = await sb.from('precificacao_combos').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  renderCombos();
-}
-
-let comboEditandoAtual = null;
-
-async function abrirEditarCombo(comboId){
-  const combo = combosCache.find(c => c.id === comboId);
-  if(!combo) return;
-  comboEditandoAtual = combo;
-  $('ecNome').value = combo.nome;
-  showMsg('editarComboMsg','','');
-
-  const hoje = hojeISO();
-  const { data: precos } = await sb.from('precificacao_combo_precos').select('*')
-    .eq('combo_id', comboId).eq('status','aprovado')
-    .lte('vigencia_inicio', hoje).order('vigencia_inicio', { ascending:false });
-  const vigente = (precos||[]).find(p => !p.vigencia_fim || p.vigencia_fim >= hoje) || null;
-  comboEditandoAtual.precoVigente = vigente;
-
-  if(!vigente){
-    $('ecSemPreco').style.display = '';
-    $('ecPrecoWrap').style.display = 'none';
-  } else if(!souMaster){
-    $('ecSemPreco').style.display = 'none';
-    $('ecPrecoWrap').style.display = 'block';
-    $('ecPrecoStatusHint').textContent = 'Esse preço já está aprovado — só o master pode editá-lo direto aqui. Você pode renomear o combo acima.';
-    $('ecPreco').value = vigente.preco_combo; $('ecPreco').disabled = true;
-    $('ecVigenciaFimWrap').style.display = vigente.vigencia_fim!=null || combo.tipo==='promocao' ? '' : 'none';
-    $('ecVigenciaFim').value = vigente.vigencia_fim || ''; $('ecVigenciaFim').disabled = true;
-  } else {
-    $('ecSemPreco').style.display = 'none';
-    $('ecPrecoWrap').style.display = 'block';
-    $('ecPrecoStatusHint').textContent = 'Editando o preço já aprovado, vigente desde '+fmtData(vigente.vigencia_inicio)+' — a mudança vale na hora, sem precisar de nova aprovação.';
-    $('ecPreco').value = vigente.preco_combo; $('ecPreco').disabled = false;
-    $('ecVigenciaFimWrap').style.display = combo.tipo==='promocao' ? '' : 'none';
-    $('ecVigenciaFim').value = vigente.vigencia_fim || ''; $('ecVigenciaFim').disabled = false;
-  }
-
-  $('modalEditarCombo').classList.add('show');
-}
-
-async function salvarEdicaoCombo(){
-  const nome = $('ecNome').value.trim();
-  if(!nome){ showMsg('editarComboMsg','Dá um nome.','err'); return; }
-
-  const btn = $('btnSalvarEdicaoCombo');
-  btn.disabled = true; btn.textContent = 'Salvando…';
-
-  if(nome !== comboEditandoAtual.nome){
-    const { error } = await sb.from('precificacao_combos').update({ nome }).eq('id', comboEditandoAtual.id);
-    if(error){ btn.disabled=false; btn.textContent='Salvar'; showMsg('editarComboMsg','Erro ao renomear: '+error.message,'err'); return; }
-  }
-
-  if(souMaster && comboEditandoAtual.precoVigente){
-    const preco_combo = Number($('ecPreco').value);
-    const vigencia_fim = comboEditandoAtual.tipo==='promocao' ? ($('ecVigenciaFim').value || null) : comboEditandoAtual.precoVigente.vigencia_fim;
-    if(!(preco_combo>=0)){ btn.disabled=false; btn.textContent='Salvar'; showMsg('editarComboMsg','Informe um preço válido.','err'); return; }
-    const { error } = await sb.from('precificacao_combo_precos').update({ preco_combo, vigencia_fim }).eq('id', comboEditandoAtual.precoVigente.id);
-    if(error){ btn.disabled=false; btn.textContent='Salvar'; showMsg('editarComboMsg','Erro ao salvar preço: '+error.message,'err'); return; }
-  }
-
-  btn.disabled = false; btn.textContent = 'Salvar';
-  fecharModal('modalEditarCombo');
-  renderCombos();
-}
-
-async function abrirHistoricoCombo(comboId){
-  comboSelecionado = combosCache.find(c => c.id === comboId) || null;
-  if(!comboSelecionado) return;
-  $('tituloHistoricoCombo').textContent = 'Histórico — '+comboSelecionado.nome;
-  $('historicoComboConteudo').innerHTML = '<div class="loading">Carregando…</div>';
-  $('modalHistoricoCombo').classList.add('show');
-
-  const { data: itens } = await sb.from('precificacao_combo_itens').select('*, precificacao_produtos(nome)').eq('combo_id', comboId);
-  comboSelecionado.itens = itens || [];
-  $('comboItensResumo').innerHTML = (itens||[]).map(i => '<span class="chip">'+i.quantidade+'× '+esc(i.precificacao_produtos?i.precificacao_produtos.nome:'?')+' ('+ELO_LABEL[i.elo]+')</span>').join('');
-
-  await carregarHistoricoCombo();
-}
-
-async function carregarHistoricoCombo(){
-  const { data, error } = await sb.from('precificacao_combo_precos')
-    .select('*, precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)')
-    .eq('combo_id', comboSelecionado.id)
-    .order('vigencia_inicio', { ascending:false });
-  if(error){ $('historicoComboConteudo').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
-  comboPrecosCache = data || [];
-  await renderHistoricoComboTabela();
-}
-
-async function somaItensVigente(itens){
-  const { data: precos } = await sb.from('precificacao_precos').select('*').eq('status','aprovado');
-  const hoje = hojeISO();
-  let soma = 0, custo = 0;
-  (itens||[]).forEach(i => {
-    const row = precoVigenteEmLista(precos||[], i.produto_id, i.elo);
-    if(!row) return;
-    soma += Number(row.preco_venda) * i.quantidade;
-    custo += Number(row.custo) * i.quantidade;
-  });
-  return { soma, custo };
-}
-
-async function renderHistoricoComboTabela(){
-  const hoje = hojeISO();
-  const { soma, custo } = await somaItensVigente(comboSelecionado.itens);
-
-  if(!comboPrecosCache.length){ $('historicoComboConteudo').innerHTML = '<div class="empty">Nenhum preço cadastrado ainda.</div>'; return; }
-
-  const linhas = comboPrecosCache.map(row => {
-    let status, statusLabel;
-    if(row.status==='pendente'){ status='pendente'; statusLabel='Pendente aprovação'; }
-    else if(row.status==='rejeitado'){ status='rejeitado'; statusLabel='Rejeitado'; }
-    else if(row.vigencia_fim && row.vigencia_fim < hoje){ status='historico'; statusLabel='Expirada em '+fmtData(row.vigencia_fim); }
-    else {
-      const aprovados = comboPrecosCache.filter(r=>r.status==='aprovado' && r.vigencia_inicio<=hoje && (!r.vigencia_fim || r.vigencia_fim>=hoje)).sort((a,b)=>b.vigencia_inicio.localeCompare(a.vigencia_inicio));
-      const atual = aprovados[0];
-      if(row.vigencia_inicio > hoje){ status='agendado'; statusLabel='Agendado'; }
-      else if(atual && atual.id===row.id){ status='vigente'; statusLabel='Vigente'; }
-      else { status='historico'; statusLabel='Histórico'; }
-    }
-    const podeExcluir = souMaster;
-    const aliquotaD = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
-    const aliquotaC = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
-    const m = calcularMargens(custo, row.preco_combo, aliquotaD, aliquotaC);
-    const alerta = calcularAlertaCombo(soma, row.preco_combo);
-
-    return '<tr>'+
-      '<td>'+fmtMoeda(row.preco_combo)+'</td>'+
-      '<td>'+fmtMoeda(soma)+'</td>'+
-      '<td>'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</td>'+
-      '<td class="mc-cell"><span class="r'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'</span><span class="p">'+fmtPct(m.mcLiquidaPct)+'</span></td>'+
-      '<td>'+fmtData(row.vigencia_inicio)+(row.vigencia_fim?' até '+fmtData(row.vigencia_fim):'')+'</td>'+
-      '<td><span class="badge badge-'+status+'">'+statusLabel+'</span></td>'+
-      '<td style="white-space:nowrap">'+(podeExcluir ? '<button class="btn-danger" onclick="excluirPrecoCombo(\''+row.id+'\')">🗑️</button>' : '')+'</td>'+
-    '</tr>';
-  }).join('');
-
-  $('historicoComboConteudo').innerHTML =
-    '<div style="overflow-x:auto"><table><thead><tr><th>Preço Combo</th><th>Soma Individual</th><th>Desconto</th><th>MC Líquida</th><th>Vigência</th><th>Status</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table></div>';
-}
-
-async function excluirPrecoCombo(id){
-  if(!confirm('Excluir este registro de preço do combo?')) return;
-  const { error } = await sb.from('precificacao_combo_precos').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  await carregarHistoricoCombo();
-  if(currentTab==='combos') renderCombos();
-}
-
-async function abrirNovoPrecoCombo(){
-  if(!comboSelecionado) return;
-  $('pcComboNome').textContent = comboSelecionado.nome;
-  $('pcComboPreco').value = '';
-  $('pcComboVigencia').value = hojeISO();
-  $('pcComboVigenciaFim').value = '';
-  $('pcComboVigenciaFimWrap').style.display = comboSelecionado.tipo === 'promocao' ? '' : 'none';
-  showMsg('precoComboMsg','','');
-
-  const { data: tributos } = await sb.from('precificacao_tributos').select('*').eq('status','aprovado').order('elo').order('categoria');
-  $('pcComboTributo').innerHTML = '<option value="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
-    (tributos||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'">'+ELO_LABEL[t.elo]+' — '+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
-
-  await atualizarResumoPrecoCombo();
-  $('modalPrecoCombo').classList.add('show');
-}
-
-async function atualizarResumoPrecoCombo(){
-  const grid = $('pcComboResumoGrid');
-  if(!grid || !comboSelecionado) return;
-  const { soma, custo } = await somaItensVigente(comboSelecionado.itens);
-  const precoCombo = Number($('pcComboPreco').value)||0;
-  const sel = $('pcComboTributo');
-  const opt = sel ? sel.options[sel.selectedIndex] : null;
-  const aliquotaD = opt ? Number(opt.dataset.aliquota||0) : 0;
-  const aliquotaC = opt ? Number(opt.dataset.aliquotaCredito||0) : 0;
-  const m = calcularMargens(custo, precoCombo, aliquotaD, aliquotaC);
-  const alerta = calcularAlertaCombo(soma, precoCombo);
-  grid.innerHTML =
-    '<div class="margem-item"><div class="lbl">Soma dos itens individuais</div><div class="val">'+fmtMoeda(soma)+'</div></div>'+
-    '<div class="margem-item"><div class="lbl">Desconto do combo</div><div style="margin-top:2px">'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</div></div>'+
-    '<div class="margem-item"><div class="lbl">MC Bruta</div><div class="val'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'<span class="pct">'+fmtPct(m.mcBrutaPct)+'</span></div></div>'+
-    '<div class="margem-item"><div class="lbl">MC Líquida</div><div class="val'+(m.mcLiquidaR<0?' neg':'')+'">'+fmtMoeda(m.mcLiquidaR)+'<span class="pct">'+fmtPct(m.mcLiquidaPct)+'</span></div></div>';
-}
-
-async function salvarPrecoCombo(){
-  const preco_combo = Number($('pcComboPreco').value);
-  const vigencia_inicio = $('pcComboVigencia').value;
-  const vigencia_fim = comboSelecionado.tipo === 'promocao' ? ($('pcComboVigenciaFim').value || null) : null;
-  const tributo_aplicado_id = $('pcComboTributo').value || null;
-  if(!vigencia_inicio){ showMsg('precoComboMsg','Informe a vigência.','err'); return; }
-  if(!(preco_combo>=0)){ showMsg('precoComboMsg','Informe um preço válido.','err'); return; }
-  if(comboSelecionado.tipo === 'promocao' && !vigencia_fim){ showMsg('precoComboMsg','Promoção precisa de uma data de fim.','err'); return; }
-  if(vigencia_fim && vigencia_fim < vigencia_inicio){ showMsg('precoComboMsg','A vigência até não pode ser antes da vigência a partir de.','err'); return; }
-
-  const btn = $('btnSalvarPrecoCombo');
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  let error;
-  const { data: existente } = await sb.from('precificacao_combo_precos').select('id, status')
-    .eq('combo_id', comboSelecionado.id).eq('vigencia_inicio', vigencia_inicio).maybeSingle();
-
-  if(existente && existente.status === 'pendente'){
-    ({ error } = await sb.from('precificacao_combo_precos').update({ preco_combo, tributo_aplicado_id, vigencia_fim }).eq('id', existente.id));
-  } else if(existente){
-    btn.disabled = false; btn.textContent = 'Salvar';
-    showMsg('precoComboMsg','Já existe um preço com essa vigência (status: '+existente.status+'). Escolha outra data, ou ajuste esse registro pela aba Aprovações/Histórico.','err');
-    return;
-  } else {
-    ({ error } = await sb.from('precificacao_combo_precos').insert({
-      combo_id: comboSelecionado.id, preco_combo, tributo_aplicado_id, vigencia_inicio, vigencia_fim,
-      criado_por: meuPerfil.id, criado_por_nome: meuPerfil.nome,
-    }));
-  }
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(error && error.code === '23505'){ showMsg('precoComboMsg','Já existe um preço com essa vigência pra esse combo. Escolha outra data, ou dá um refresh na página (Ctrl+Shift+R) — pode ser cache de uma versão antiga.','err'); return; }
-  if(error){ showMsg('precoComboMsg','Erro: '+error.message,'err'); return; }
-  fecharModal('modalPrecoCombo');
-  await carregarHistoricoCombo();
-  if(currentTab==='combos') renderCombos();
-  atualizarBadgePendentes();
-}
-
-// ── APROVAÇÕES ─────────────────────────────────────────────
-async function renderAprovacoes(){
-  const el = $('mainContent');
-  el.innerHTML = '<div class="loading">Carregando…</div>';
-
-  const [precosR, tributosR, combosR, comboItensR, itemPrecosR] = await Promise.all([
-    sb.from('precificacao_precos').select('*, precificacao_produtos(nome), precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
-    sb.from('precificacao_tributos').select('*').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
-    sb.from('precificacao_combo_precos').select('*, precificacao_combos(nome, tipo), precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
-    sb.from('precificacao_combo_itens').select('*'),
-    sb.from('precificacao_precos').select('*').eq('status','aprovado'),
-  ]);
-  if(precosR.error || tributosR.error || combosR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro ao carregar aprovações.</div></div>'; return; }
-
-  const precos = precosR.data || [];
-  const tributos = tributosR.data || [];
-  const combos = combosR.data || [];
-  const comboItens = comboItensR.data || [];
-  const itemPrecos = itemPrecosR.data || [];
-  const precosPend = precos.filter(p => p.status==='pendente');
-  const precosRej = precos.filter(p => p.status==='rejeitado');
-  const tribPend = tributos.filter(t => t.status==='pendente');
-  const tribRej = tributos.filter(t => t.status==='rejeitado');
-  const comboPend = combos.filter(c => c.status==='pendente');
-  const comboRej = combos.filter(c => c.status==='rejeitado');
-
-  const acoes = (tabela, id) => souMaster
-    ? '<button class="btn-outline btn btn-sm" onclick="aprovarRejeitar(\''+tabela+'\',\''+id+'\',\'aprovado\')">Aprovar</button> '+
-      '<button class="btn-danger" onclick="aprovarRejeitar(\''+tabela+'\',\''+id+'\',\'rejeitado\')">Rejeitar</button>'
-    : '<span class="badge badge-pendente">Aguardando</span>';
-
-  const tabelaPrecos = (lista, comAcao) => !lista.length ? '<div class="empty">Nada aqui.</div>' :
-    '<div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo</th><th>Preço Venda</th><th>Margem</th><th>Tributo</th><th>Vigência</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
-      lista.map(row => '<tr>'+
-        '<td>'+esc(row.precificacao_produtos ? row.precificacao_produtos.nome : '—')+'</td>'+
-        '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
-        (comAcao && souMaster
-          ? '<td><input class="inp" style="width:90px" id="apCusto_'+row.id+'" type="number" step="0.01" value="'+row.custo+'" oninput="atualizarMargemPrecoLive(\''+row.id+'\')"></td>'+
-            '<td><input class="inp" style="width:90px" id="apPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_venda+'" oninput="atualizarMargemPrecoLive(\''+row.id+'\')"></td>'
-          : '<td>'+fmtMoeda(row.custo)+'</td><td>'+fmtMoeda(row.preco_venda)+'</td>')+
-        '<td id="apMargem_'+row.id+'">'+margemHtml(row.custo, row.preco_venda)+'</td>'+
-        '<td>'+(row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+')' : '—')+'</td>'+
-        (comAcao && souMaster
-          ? '<td><input class="inp" style="width:130px" id="apVigencia_'+row.id+'" type="date" value="'+row.vigencia_inicio+'"></td>'
-          : '<td>'+fmtData(row.vigencia_inicio)+'</td>')+
-        '<td>'+esc(row.criado_por_nome||'—')+'</td>'+
-        (comAcao ? '<td style="white-space:nowrap">'+(souMaster
-          ? '<button class="btn-outline btn btn-sm" onclick="editarEAprovarPreco(\''+row.id+'\',\''+(row.tributo_aplicado_id||'')+'\')">Editar e Aprovar</button> '+
-            '<button class="btn-danger" onclick="aprovarRejeitar(\'precificacao_precos\',\''+row.id+'\',\'rejeitado\')">Rejeitar</button>'
-          : '<span class="badge badge-pendente">Aguardando</span>')+'</td>' : '')+
-      '</tr>').join('')+
-    '</tbody></table></div>';
-
-  const tabelaTributos = (lista, comAcao) => !lista.length ? '<div class="empty">Nada aqui.</div>' :
-    '<div style="overflow-x:auto"><table><thead><tr><th>Elo</th><th>Categoria</th><th>Tipo</th><th>Alíquota</th><th>Créd. Compra</th><th>Vigência</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
-      lista.map(t => '<tr>'+
-        '<td><span class="badge badge-tipo">'+ELO_LABEL[t.elo]+'</span></td>'+
-        '<td>'+esc(t.categoria)+'</td>'+
-        '<td>'+esc(t.tipo_tributo)+'</td>'+
-        '<td>'+fmtPct(t.aliquota)+'</td>'+
-        '<td>'+(Number(t.aliquota_credito)>0?fmtPct(t.aliquota_credito):'—')+'</td>'+
-        '<td>'+fmtData(t.vigencia_inicio)+'</td>'+
-        '<td>'+esc(t.criado_por_nome||'—')+'</td>'+
-        (comAcao ? '<td style="white-space:nowrap">'+acoes('precificacao_tributos', t.id)+'</td>' : '')+
-      '</tr>').join('')+
-    '</tbody></table></div>';
-
-  const tabelaCombos = (lista, comAcao) => !lista.length ? '<div class="empty">Nada aqui.</div>' :
-    '<div style="overflow-x:auto"><table><thead><tr><th>Combo</th><th>Preço</th><th>Soma Individual</th><th>Desconto</th><th>Vigência</th><th>Até (promoção)</th><th>Proposto por</th>'+(comAcao?'<th></th>':'')+'</tr></thead><tbody>'+
-      lista.map(row => {
-        const meusItens = comboItens.filter(i => i.combo_id === row.combo_id);
-        let soma = 0;
-        meusItens.forEach(i => {
-          const pv = precoVigenteEmLista(itemPrecos, i.produto_id, i.elo);
-          if(pv) soma += Number(pv.preco_venda) * i.quantidade;
-        });
-        const alerta = calcularAlertaCombo(soma, row.preco_combo);
-        const ehPromocao = row.precificacao_combos && row.precificacao_combos.tipo === 'promocao';
-        return '<tr>'+
-          '<td>'+esc(row.precificacao_combos ? row.precificacao_combos.nome : '—')+(ehPromocao?' <span class="badge badge-tipo">promoção</span>':'')+'</td>'+
-          (comAcao && souMaster
-            ? '<td><input class="inp" style="width:90px" id="apComboPreco_'+row.id+'" type="number" step="0.01" value="'+row.preco_combo+'" data-soma="'+soma+'" data-original="'+row.preco_combo+'" oninput="atualizarDescontoComboLive(\''+row.id+'\')">'+
-              '<div class="hint" id="apComboDelta_'+row.id+'" style="margin-top:2px"></div></td>'
-            : '<td>'+fmtMoeda(row.preco_combo)+'</td>')+
-          '<td>'+fmtMoeda(soma)+'</td>'+
-          '<td id="apComboDesconto_'+row.id+'">'+badgeAlertaCombo(alerta.nivel, alerta.descontoPct)+'</td>'+
-          (comAcao && souMaster
-            ? '<td><input class="inp" style="width:130px" id="apComboVigencia_'+row.id+'" type="date" value="'+row.vigencia_inicio+'"></td>'
-            : '<td>'+fmtData(row.vigencia_inicio)+'</td>')+
-          (comAcao && souMaster
-            ? '<td>'+(ehPromocao ? '<input class="inp" style="width:130px" id="apComboVigenciaFim_'+row.id+'" type="date" value="'+(row.vigencia_fim||'')+'">' : '—')+'</td>'
-            : '<td>'+(row.vigencia_fim ? fmtData(row.vigencia_fim) : '—')+'</td>')+
-          '<td>'+esc(row.criado_por_nome||'—')+'</td>'+
-          (comAcao ? '<td style="white-space:nowrap">'+(souMaster
-            ? '<button class="btn-outline btn btn-sm" onclick="editarEAprovarCombo(\''+row.id+'\',\''+(row.tributo_aplicado_id||'')+'\')">Editar e Aprovar</button> '+
-              '<button class="btn-danger" onclick="aprovarRejeitar(\'precificacao_combo_precos\',\''+row.id+'\',\'rejeitado\')">Rejeitar</button>'
-            : '<span class="badge badge-pendente">Aguardando</span>')+'</td>' : '')+
-        '</tr>';
-      }).join('')+
-    '</tbody></table></div>';
-
-  el.innerHTML =
-    '<div class="card">'+
-      '<h2>Preços pendentes</h2>'+
-      '<p class="hint">Propostas de backoffice — só passam a valer depois de aprovadas.</p>'+
-      tabelaPrecos(precosPend, true)+
-    '</div>'+
-    '<div class="card">'+
-      '<h2>Tributos pendentes</h2>'+
-      tabelaTributos(tribPend, true)+
-    '</div>'+
-    '<div class="card">'+
-      '<h2>Combos pendentes</h2>'+
-      '<p class="hint">🔴 desconto acima de 20% sobre a soma dos itens · 🟡 entre 15% e 20%.</p>'+
-      tabelaCombos(comboPend, true)+
-    '</div>'+
-    (precosRej.length || tribRej.length || comboRej.length ?
-      '<div class="card">'+
-        '<h2>Rejeitados recentemente</h2>'+
-        '<p class="hint">Fica registrado pra quem propôs saber que precisa corrigir e reenviar.</p>'+
-        (precosRej.length ? '<p style="font-size:.78rem;font-weight:600;margin-bottom:8px">Preços</p>'+tabelaPrecos(precosRej, false) : '')+
-        (tribRej.length ? '<p style="font-size:.78rem;font-weight:600;margin:14px 0 8px">Tributos</p>'+tabelaTributos(tribRej, false) : '')+
-        (comboRej.length ? '<p style="font-size:.78rem;font-weight:600;margin:14px 0 8px">Combos</p>'+tabelaCombos(comboRej, false) : '')+
-      '</div>' : '');
-}
-
-async function editarEAprovarPreco(id, tributoAtualId){
-  const custo = Number($('apCusto_'+id).value);
-  const preco_venda = Number($('apPreco_'+id).value);
-  const vigencia_inicio = $('apVigencia_'+id).value;
-  if(!(custo>=0) || !(preco_venda>=0) || !vigencia_inicio){ alert('Preencha custo, preço e vigência válidos.'); return; }
-  const { error } = await sb.rpc('editar_aprovar_preco', {
-    p_id: id, p_custo: custo, p_preco_venda: preco_venda,
-    p_tributo_aplicado_id: tributoAtualId || null, p_vigencia_inicio: vigencia_inicio,
-  });
-  if(error){ alert('Erro: '+error.message); return; }
-  renderAprovacoes();
-  atualizarBadgePendentes();
-}
-
-async function editarEAprovarCombo(id, tributoAtualId){
-  const preco_combo = Number($('apComboPreco_'+id).value);
-  const vigencia_inicio = $('apComboVigencia_'+id).value;
-  const campoFim = $('apComboVigenciaFim_'+id);
-  const vigencia_fim = campoFim ? (campoFim.value || null) : null;
-  if(!(preco_combo>=0) || !vigencia_inicio){ alert('Preencha o preço e a vigência válidos.'); return; }
-  if(campoFim && !vigencia_fim){ alert('Essa é uma promoção — preencha a vigência até.'); return; }
-  const { error } = await sb.rpc('editar_aprovar_combo_preco', {
-    p_id: id, p_preco_combo: preco_combo,
-    p_tributo_aplicado_id: tributoAtualId || null, p_vigencia_inicio: vigencia_inicio, p_vigencia_fim: vigencia_fim,
-  });
-  if(error){ alert('Erro: '+error.message); return; }
-  renderAprovacoes();
-  atualizarBadgePendentes();
-}
-
-async function aprovarRejeitar(tabela, id, novoStatus){
-  if(novoStatus === 'rejeitado' && !confirm('Rejeitar esta proposta? Quem propôs vai poder corrigir e reenviar.')) return;
-  const { error } = await sb.from(tabela).update({ status: novoStatus }).eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  renderAprovacoes();
-  atualizarBadgePendentes();
-}
-
-// ── RELATÓRIO (preços finais por elo — cardápio) ──────────
-let relatorioEloAtual = 'loja_consumidor';
-
-function mudarRelatorioElo(elo){
-  relatorioEloAtual = elo;
-  renderRelatorio();
-}
-
-async function renderRelatorio(){
-  const el = $('mainContent');
-  const subnav = '<div class="subnav">'+PRECOS_ELO_TABS.map(t =>
-    '<div class="subnav-item'+(t.elo===relatorioEloAtual?' active':'')+'" onclick="mudarRelatorioElo(\''+t.elo+'\')">'+t.label+'</div>'
-  ).join('')+'</div>';
-  el.innerHTML = subnav+'<div class="loading">Carregando…</div>';
-
-  const [prodR, precoR, combosR, comboPrecosR, comboItensR] = await Promise.all([
-    sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
-    sb.from('precificacao_precos').select('*').eq('status','aprovado'),
-    sb.from('precificacao_combos').select('*').eq('ativo', true),
-    sb.from('precificacao_combo_precos').select('*').eq('status','aprovado'),
-    sb.from('precificacao_combo_itens').select('*, precificacao_produtos(nome)'),
-  ]);
-  if(prodR.error || precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
-
-  const produtos = (prodR.data||[]).filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(relatorioEloAtual));
-  const todosPrecos = precoR.data || [];
-
-  const linhas = produtos.map(p => {
-    const row = precoVigenteDe(todosPrecos, p.id, relatorioEloAtual);
-    return { categoria: p.categoria, nome: p.nome, custo: row?Number(row.custo):null, preco: row?Number(row.preco_venda):null, vigencia: row?row.vigencia_inicio:null };
-  }).filter(l => l.preco != null);
-
-  window.__relatorioLinhasCache = linhas;
-
-  // Combos e promoções: mostra TODOS os períodos de preço (vigente, agendado, expirado),
-  // sinalizando o status de cada um, com os itens que compõem cada combo.
-  const hoje = hojeISO();
-  const combos = combosR.data || [];
-  const comboPrecos = comboPrecosR.data || [];
-  const comboItens = comboItensR.data || [];
-
-  const linhasCombo = [];
-  combos.forEach(c => {
-    const meusItens = comboItens.filter(i => i.combo_id === c.id);
-    const itensTxt = meusItens.map(i => i.quantidade+'× '+esc(i.precificacao_produtos?i.precificacao_produtos.nome:'?')).join(', ');
-    const precosDoCombo = comboPrecos.filter(p => p.combo_id === c.id).sort((a,b)=>a.vigencia_inicio.localeCompare(b.vigencia_inicio));
-    precosDoCombo.forEach(p => {
-      let status, statusLabel;
-      if(p.vigencia_inicio > hoje){ status='agendado'; statusLabel='Agendado a partir de '+fmtData(p.vigencia_inicio); }
-      else if(p.vigencia_fim && p.vigencia_fim < hoje){ status='expirado'; statusLabel='Expirado em '+fmtData(p.vigencia_fim); }
-      else { status='vigente'; statusLabel='Vigente agora'; }
-      linhasCombo.push({ tipo: c.tipo, nome: c.nome, itensTxt, preco: Number(p.preco_combo), vigencia: p.vigencia_inicio, vigenciaFim: p.vigencia_fim, status, statusLabel });
-    });
-  });
-  const ordemStatus = { vigente:0, agendado:1, expirado:2 };
-  linhasCombo.sort((a,b) => (ordemStatus[a.status]-ordemStatus[b.status]) || b.vigencia.localeCompare(a.vigencia));
-  window.__relatorioComboCache = linhasCombo;
-
-  if(!linhas.length && !linhasCombo.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum preço aprovado ainda pra esse elo.</div></div>'; return; }
 
   const porCategoria = {};
-  linhas.forEach(l => { (porCategoria[l.categoria] = porCategoria[l.categoria] || []).push(l); });
-  const categorias = Object.keys(porCategoria).sort();
+  produtos.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
 
-  const corStatus = { vigente:'var(--verde,#2e7d32)', agendado:'#b8860b', expirado:'var(--text-light)' };
-  const comboSecao = linhasCombo.length ? '<div class="card"><h2>🎁 Combos e Promoções</h2><div style="overflow-x:auto"><table><thead><tr><th>Nome</th><th>Itens</th><th>Tipo</th><th>Preço</th><th>Vigência</th><th>Status</th></tr></thead><tbody>'+
-    linhasCombo.map(l => '<tr><td>'+esc(l.nome)+'</td><td style="font-size:.78rem;color:var(--text-light)">'+(l.itensTxt||'—')+'</td><td>'+(l.tipo==='promocao'?'Promoção':'Combo')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+(l.vigenciaFim?' até '+fmtData(l.vigenciaFim):'')+'</td><td><span style="color:'+corStatus[l.status]+'">'+l.statusLabel+'</span></td></tr>').join('')+
-  '</tbody></table></div></div>' : '';
+  const optgroups = Object.keys(porCategoria).sort().map(cat =>
+    '<optgroup label="'+esc(cat)+'">'+
+      porCategoria[cat].map(p => '<option value="'+p.id+'" data-origem="'+esc(p.origem)+'">'+esc(p.nome)+'</option>').join('')+
+    '</optgroup>'
+  ).join('');
 
-  el.innerHTML = subnav +
-    '<div class="card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
-        '<h2 style="margin:0">Preços vigentes — '+ELO_LABEL[relatorioEloAtual]+'</h2>'+
-        '<button class="btn-outline btn btn-sm" onclick="exportarRelatorioCSV()">⬇ Exportar CSV/Excel</button>'+
-      '</div>'+
-      '<p class="hint">Pronto pra usar como base do cardápio. Só entram produtos (e combos/promoções) com preço aprovado vigente hoje.</p>'+
-    '</div>'+
-    categorias.map(cat => {
-      const itens = porCategoria[cat].sort((a,b) => a.nome.localeCompare(b.nome));
-      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço</th><th>Vigente desde</th></tr></thead><tbody>'+
-        itens.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.custo!=null?fmtMoeda(l.custo):'—')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+'</td></tr>').join('')+
-      '</tbody></table></div></div>';
-    }).join('') +
-    comboSecao;
+  wrap.innerHTML =
+    '<div class="field" style="flex:2"><label>Produto</label><select class="inp" id="perdaProduto" onchange="atualizarUnidadeLabel()">'+
+      optgroups+
+    '</select></div>'+
+    '<div class="field"><label id="perdaQtdLabel">Quantidade</label><input class="inp" type="number" step="0.01" min="0.01" id="perdaQtd"></div>';
+  atualizarUnidadeLabel();
 }
 
-function exportarRelatorioCSV(){
-  const linhas = window.__relatorioLinhasCache || [];
-  const linhasCombo = window.__relatorioComboCache || [];
-  if(!linhas.length && !linhasCombo.length) return;
-  const header = 'Categoria/Tipo;Produto;Itens;Custo;Preco;Vigente desde;Vigente ate;Status\n';
-  const corpoProdutos = linhas.map(l =>
-    [l.categoria, l.nome, '', l.custo!=null?l.custo.toFixed(2).replace('.',','):'', l.preco.toFixed(2).replace('.',','), l.vigencia||'', '', 'Vigente agora']
-      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
-  ).join('\n');
-  const corpoCombos = linhasCombo.map(l =>
-    [l.tipo==='promocao'?'Promoção':'Combo', l.nome, l.itensTxt||'', '', l.preco.toFixed(2).replace('.',','), l.vigencia||'', l.vigenciaFim||'', l.statusLabel]
-      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
-  ).join('\n');
-  const corpo = [corpoProdutos, corpoCombos].filter(Boolean).join('\n');
-  const blob = new Blob(['\uFEFF'+header+corpo], { type:'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'precos-'+relatorioEloAtual+'-'+hojeISO()+'.csv';
-  a.click();
+function atualizarUnidadeLabel(){
+  const sel = $('perdaProduto');
+  const lbl = $('perdaQtdLabel');
+  if(!sel || !lbl) return;
+  const opt = sel.options[sel.selectedIndex];
+  // Mesma regra do trigger fn_perdas_calcular_custo: kg só pros sabores vendidos por peso
+  // (origem fabrica_insumo). Todo o resto — inclusive Copinho/Casquinha/Cestinha, que também
+  // são categoria Gelato — é por unidade.
+  const unidade = (opt && opt.dataset.origem === 'fabrica_insumo') ? 'kg' : 'un';
+  lbl.textContent = 'Quantidade (' + unidade + ')';
+}
+
+async function registrarPerda(){
+  const data_perda = $('perdaData').value;
+  const motivo = $('perdaMotivo').value;
+  const observacao = $('perdaObs').value.trim() || null;
+  const quantidade = Number($('perdaQtd').value);
+  const produtoSel = $('perdaProduto');
+
+  if(!data_perda){ showMsg('novaPerdaMsg','Informe a data da perda.','err'); return; }
+  if(!produtoSel || !produtoSel.value){ showMsg('novaPerdaMsg','Selecione um produto.','err'); return; }
+  if(!quantidade || quantidade <= 0){ showMsg('novaPerdaMsg','Informe uma quantidade válida.','err'); return; }
+
+  // item_nome, tipo_perda, unidade e custo_unitario_aplicado são preenchidos
+  // automaticamente pelo trigger fn_perdas_calcular_custo a partir da Precificação.
+  const payload = {
+    loja: lojaAtual,
+    precificacao_produto_id: produtoSel.value,
+    quantidade,
+    motivo,
+    observacao,
+    data_perda,
+    registrado_por: meuPerfil.id,
+    registrado_por_nome: meuPerfil.nome,
+  };
+
+  const btn = $('btnRegistrarPerda');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  const { data, error } = await sb.from('perdas').insert(payload).select().single();
+  btn.disabled = false; btn.textContent = 'Registrar Perda';
+
+  if(error){ showMsg('novaPerdaMsg','Erro: '+error.message,'err'); return; }
+  showMsg('novaPerdaMsg','Perda registrada! Valor: '+fmtMoeda(data.valor_total),'ok');
+  setTimeout(() => renderNovaPerda(), 1200);
+}
+
+// ── HISTÓRICO (loja) ──────────────────────────────────────
+function labelTipo(tipo){
+  return { gelato:'Gelato', revenda:'Revenda', variegato:'Variegato' }[tipo] || tipo;
+}
+
+async function renderHistorico(){
+  const el = $('mainContent');
+  const mesDefault = new Date().toISOString().slice(0,7);
+  el.innerHTML =
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:14px">'+
+        '<h2 style="margin:0">Histórico — '+esc(lojaAtual)+'</h2>'+
+        '<div class="field"><label>Mês</label><input class="inp" type="month" id="histMes" value="'+mesDefault+'" onchange="carregarHistorico()"></div>'+
+      '</div>'+
+      '<div id="historicoTabela" class="loading">Carregando…</div>'+
+    '</div>';
+  await carregarHistorico();
+}
+
+async function carregarHistorico(){
+  const mes = $('histMes').value;
+  const [ano, mesNum] = mes.split('-').map(Number);
+  const primeiroDia = mes+'-01';
+  const ultimoDia = new Date(ano, mesNum, 0).toISOString().slice(0,10);
+
+  const { data, error } = await sb.from('perdas').select('*')
+    .eq('loja', lojaAtual)
+    .gte('data_perda', primeiroDia).lte('data_perda', ultimoDia)
+    .order('data_perda', { ascending:false });
+
+  if(error){ $('historicoTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
+  const lista = data || [];
+  if(!lista.length){ $('historicoTabela').innerHTML = '<div class="empty">Nenhuma perda registrada neste mês.</div>'; return; }
+
+  const totalValor = lista.reduce((a,p)=>a+Number(p.valor_total),0);
+  $('historicoTabela').innerHTML =
+    '<div class="stat-box"><div class="stat"><div class="num">'+fmtMoeda(totalValor)+'</div><div class="lbl">Total do mês</div></div>'+
+    '<div class="stat"><div class="num">'+lista.length+'</div><div class="lbl">Lançamentos</div></div></div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Item</th><th>Qtd</th><th>Motivo</th><th>Observação</th><th>Valor</th>'+(souMaster?'<th></th>':'')+'</tr></thead><tbody>'+
+      lista.map(p => (
+        '<tr>'+
+          '<td>'+fmtData(p.data_perda)+'</td>'+
+          '<td><span class="badge badge-tipo">'+labelTipo(p.tipo_perda)+'</span></td>'+
+          '<td>'+esc(p.item_nome)+'</td>'+
+          '<td>'+Number(p.quantidade)+' '+esc(p.unidade)+'</td>'+
+          '<td>'+esc(p.motivo)+'</td>'+
+          '<td>'+esc(p.observacao||'—')+'</td>'+
+          '<td>'+fmtMoeda(p.valor_total)+'</td>'+
+          (souMaster ? '<td><button class="btn-danger" onclick="excluirPerda(\''+p.id+'\')">Excluir</button></td>' : '')+
+        '</tr>'
+      )).join('')+
+    '</tbody></table></div>'+
+    (souMaster
+      ? '<p style="font-size:.72rem;color:var(--text-light);margin-top:10px">Só o master pode excluir lançamentos por aqui — a exclusão é definitiva.</p>'
+      : '<p style="font-size:.72rem;color:var(--text-light);margin-top:10px">Lançamentos não podem ser editados ou excluídos por aqui. Em caso de erro, fale com o master.</p>');
+}
+
+async function excluirPerda(id){
+  if(!confirm('Excluir este lançamento de perda? Essa ação não pode ser desfeita.')) return;
+  const { error } = await sb.from('perdas').delete().eq('id', id);
+  if(error){ alert('Erro ao excluir: '+error.message); return; }
+  carregarHistorico();
+}
+
+// ── RELATÓRIO MENSAL (master/backoffice) ──────────────────
+async function renderRelatorio(){
+  const mesDefault = new Date().toISOString().slice(0,7);
+  $('mainContent').innerHTML =
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:14px">'+
+        '<div class="field"><label>Mês de referência</label><input class="inp" type="month" id="relMes" value="'+mesDefault+'" onchange="carregarRelatorio()"></div>'+
+        '<button class="btn-outline btn btn-sm" onclick="exportarRelatorioExcel()">⬇ Exportar Excel</button>'+
+      '</div>'+
+      '<div id="relatorioConteudo" class="loading">Carregando…</div>'+
+    '</div>';
+  await carregarRelatorio();
+}
+
+async function carregarRelatorio(){
+  const mes = $('relMes').value;
+  const mesRef = mes+'-01';
+  const [ano, mesNum] = mes.split('-').map(Number);
+  const ultimoDia = new Date(ano, mesNum, 0).toISOString().slice(0,10);
+
+  const [resumoR, detalheR] = await Promise.all([
+    sb.from('vw_perdas_resumo_mensal').select('*').eq('mes_referencia', mesRef),
+    sb.from('perdas').select('*').gte('data_perda', mesRef).lte('data_perda', ultimoDia).order('loja').order('data_perda'),
+  ]);
+  if(resumoR.error){ $('relatorioConteudo').innerHTML = '<div class="empty">Erro: '+esc(resumoR.error.message)+'</div>'; return; }
+  const resumo = resumoR.data || [];
+  const detalhe = detalheR.data || [];
+  window.__relatorioResumoCache = resumo;
+  window.__relatorioDetalheCache = detalhe;
+
+  // Agrega por loja
+  const porLoja = {};
+  resumo.forEach(r => {
+    if(!porLoja[r.loja]) porLoja[r.loja] = { qtd:0, valor:0 };
+    porLoja[r.loja].qtd += Number(r.qtd_lancamentos);
+    porLoja[r.loja].valor += Number(r.valor_total);
+  });
+  const lojas = Object.keys(porLoja).sort();
+  const totalGeral = lojas.reduce((a,l)=>a+porLoja[l].valor,0);
+  const qtdGeral = lojas.reduce((a,l)=>a+porLoja[l].qtd,0);
+
+  // Agrega por tipo_perda
+  const porTipo = {};
+  resumo.forEach(r => {
+    porTipo[r.tipo_perda] = (porTipo[r.tipo_perda]||0) + Number(r.valor_total);
+  });
+
+  const tabelaLoja = lojas.length ?
+    '<div class="table-wrap"><table><thead><tr><th>Loja</th><th>Lançamentos</th><th>Valor Total</th></tr></thead><tbody>'+
+      lojas.map(l => '<tr><td>'+esc(l)+'</td><td>'+porLoja[l].qtd+'</td><td>'+fmtMoeda(porLoja[l].valor)+'</td></tr>').join('')+
+      '<tr class="total-row"><td>Total Geral</td><td>'+qtdGeral+'</td><td>'+fmtMoeda(totalGeral)+'</td></tr>'+
+    '</tbody></table></div>'
+    : '<div class="empty">Nenhuma perda registrada neste mês.</div>';
+
+  const tabelaTipo = Object.keys(porTipo).length ?
+    '<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Valor Total</th></tr></thead><tbody>'+
+      Object.keys(porTipo).map(t => '<tr><td>'+labelTipo(t)+'</td><td>'+fmtMoeda(porTipo[t])+'</td></tr>').join('')+
+    '</tbody></table></div>' : '';
+
+  $('relatorioConteudo').innerHTML =
+    '<h3 style="font-family:\'Cormorant Garamond\',serif;font-size:1.05rem;color:var(--bordo-dark);margin-bottom:8px">Resumo por loja</h3>'+
+    tabelaLoja+
+    '<h3 style="font-family:\'Cormorant Garamond\',serif;font-size:1.05rem;color:var(--bordo-dark);margin:22px 0 8px">Resumo por tipo de perda</h3>'+
+    tabelaTipo;
+}
+
+function exportarRelatorioExcel(){
+  const detalhe = window.__relatorioDetalheCache || [];
+  if(!detalhe.length){ alert('Não há dados para exportar.'); return; }
+  const mes = $('relMes').value;
+
+  const porLoja = {};
+  detalhe.forEach(p => {
+    if(!porLoja[p.loja]) porLoja[p.loja] = { qtd:0, valor:0 };
+    porLoja[p.loja].qtd += 1;
+    porLoja[p.loja].valor += Number(p.valor_total);
+  });
+  const linhasResumo = Object.keys(porLoja).sort().map(l => ({
+    Loja: l, Lançamentos: porLoja[l].qtd, 'Valor Total (R$)': porLoja[l].valor,
+  }));
+  const totalGeral = Object.values(porLoja).reduce((a,l)=>a+l.valor,0);
+  const qtdGeral = Object.values(porLoja).reduce((a,l)=>a+l.qtd,0);
+  linhasResumo.push({ Loja: 'TOTAL GERAL', Lançamentos: qtdGeral, 'Valor Total (R$)': totalGeral });
+
+  const linhasDetalhe = detalhe.map(p => ({
+    Loja: p.loja, Data: fmtData(p.data_perda), Tipo: labelTipo(p.tipo_perda), Item: p.item_nome,
+    Quantidade: Number(p.quantidade), Unidade: p.unidade, Motivo: p.motivo,
+    Observação: p.observacao||'', 'Valor (R$)': Number(p.valor_total),
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhasResumo), 'Resumo por Loja');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhasDetalhe), 'Lançamentos Detalhados');
+  XLSX.writeFile(wb, 'perdas-'+mes+'.xlsx');
 }
 
 verificarAcessoEIniciar();
