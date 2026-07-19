@@ -213,8 +213,7 @@
       <div class="field" style="flex:1">
         <label>Elo</label>
         <select class="inp" id="trElo">
-          <option value="loja_consumidor">Loja → Consumidor</option>
-          <option value="loja_delivery">Loja → Delivery</option>
+          <option value="loja_consumidor">Loja → Consumidor (vale também pro Delivery)</option>
         </select>
       </div>
       <div class="field" style="flex:1"><label>Categoria</label><input class="inp" id="trCategoria" placeholder="Gelato, Bebida..."></div>
@@ -547,28 +546,34 @@ function atualizarCategoriasDatalist(){
 }
 
 async function carregarProdutos(){
-  const { data, error } = await sb.from('precificacao_produtos').select('*').in('origem', ['revenda','consumo_loja']).order('nome');
+  const { data, error } = await sb.from('precificacao_produtos').select('*').in('origem', ['revenda','consumo_loja']).order('categoria').order('nome');
   if(error){ $('produtosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
   produtosCache = data || [];
   atualizarCategoriasDatalist();
   if(!produtosCache.length){ $('produtosTabela').innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'; return; }
 
-  $('produtosTabela').innerHTML =
-    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Categoria</th><th>Origem</th><th>Status</th><th></th></tr></thead><tbody>'+
-      produtosCache.map(p => (
+  const porCategoria = {};
+  produtosCache.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
+  const categorias = Object.keys(porCategoria).sort();
+
+  $('produtosTabela').innerHTML = categorias.map(cat => {
+    const itens = porCategoria[cat];
+    return '<h2 style="margin:20px 0 8px">'+esc(cat)+'</h2>'+
+    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Origem</th><th>Status</th><th></th></tr></thead><tbody>'+
+      itens.map(p => (
         '<tr class="'+(p.ativo?'':'inativo')+'">'+
           '<td>'+esc(p.nome)+'</td>'+
-          '<td>'+esc(p.categoria)+'</td>'+
           '<td><span class="badge badge-tipo">'+(ORIGEM_LABEL[p.origem]||p.origem)+'</span></td>'+
           '<td>'+(p.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
           '<td style="white-space:nowrap">'+
             '<button class="btn-outline btn btn-sm" onclick="abrirEditarProduto(\''+p.id+'\')">Editar</button> '+
             '<button class="btn-danger" onclick="toggleAtivoProduto(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Desativar':'Reativar')+'</button> '+
-            (souMaster ? '<button class="btn-danger" onclick="excluirProduto(\''+p.id+'\')">🗑️</button>' : '')+
+            (souMaster ? '<button class="btn-danger" onclick="excluirProduto(\''+p.id+'\')">\ud83d\uddd1\ufe0f</button>' : '')+
           '</td>'+
         '</tr>'
       )).join('')+
     '</tbody></table></div>';
+  }).join('');
 }
 
 function onOrigemProdutoChange(){} // reservado — sem dependências hoje
@@ -1133,17 +1138,19 @@ function renderHistoricoTabela(){
 
 async function popularTributosCheckboxDoElo(elo, selecionadosIds){
   selecionadosIds = selecionadosIds || [];
-  const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', elo);
+  const eloTributo = elo === 'loja_delivery' ? 'loja_consumidor' : elo;
+  const { data, error } = await sb.from('precificacao_tributos').select('*').eq('elo', eloTributo);
   const wrap = $('pcTributosLista');
   if(error){ wrap.innerHTML = '<p class="hint">Erro ao carregar impostos.</p>'; atualizarMargensModal(); return; }
   const lista = (data||[]).filter(t => t.status === 'aprovado' || selecionadosIds.includes(t.id)).sort((a,b) => a.categoria.localeCompare(b.categoria));
-  wrap.innerHTML = !lista.length ? '<p class="hint">Nenhum imposto cadastrado pra esse elo ainda.</p>' :
+  const aviso = elo === 'loja_delivery' ? '<p class="hint" style="margin-bottom:6px">Delivery usa os mesmos impostos do Loja → Consumidor.</p>' : '';
+  wrap.innerHTML = aviso + (!lista.length ? '<p class="hint">Nenhum imposto cadastrado pra esse elo ainda.</p>' :
     lista.map(t => (
       '<label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;font-size:.85rem">'+
         '<input type="checkbox" class="pc-tributo-check" value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(selecionadosIds.includes(t.id)?' checked':'')+' onchange="atualizarMargensModal()" style="width:16px;height:16px">'+
         esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+(t.status!=='aprovado'?' — '+t.status:'')+')'+
       '</label>'
-    )).join('');
+    )).join(''));
   atualizarMargensModal();
 }
 
