@@ -1013,17 +1013,29 @@ async function renderPrecos(){
   ).join('')+'</div>';
 
   try {
-    const [prodR, precoR] = await Promise.all([
+    const [prodR, precoR, tribLinksR] = await Promise.all([
       sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
-      sb.from('precificacao_precos').select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)'),
+      sb.from('precificacao_precos').select('*'),
+      sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(aliquota, aliquota_credito)'),
     ]);
     if(prodR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro: '+esc(prodR.error.message)+'</div></div>'; return; }
     if(precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro: '+esc(precoR.error.message)+'</div></div>'; return; }
 
     const produtos = prodR.data || [];
     const todosPrecos = precoR.data || [];
+    // Soma TODOS os tributos marcados por preço (N:N) — o campo legado
+    // tributo_aplicado_id guarda só o primeiro marcado e não deve ser usado
+    // pra calcular margem (isso causava MC Líquida errada na lista).
+    const somaTributosPorPreco = {};
+    (tribLinksR.data || []).forEach(t => {
+      if(!t.precificacao_tributos) return;
+      const s = somaTributosPorPreco[t.preco_id] || (somaTributosPorPreco[t.preco_id] = { debito:0, credito:0 });
+      s.debito += Number(t.precificacao_tributos.aliquota) || 0;
+      s.credito += Number(t.precificacao_tributos.aliquota_credito) || 0;
+    });
     window.__produtosAtivosCache = produtos;
     window.__todosPrecosCache = todosPrecos;
+    window.__somaTributosPorPrecoCache = somaTributosPorPreco;
 
     const produtosFiltrados = produtos.filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(precosEloAtual));
 
@@ -1036,8 +1048,9 @@ async function renderPrecos(){
     el.innerHTML = subnav + categorias.map(cat => {
       const linhas = porCategoria[cat].map(p => {
         const row = precoVigenteDe(todosPrecos, p.id, precosEloAtual);
-        const aliquotaD = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
-        const aliquotaC = row && row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
+        const soma = row ? somaTributosPorPreco[row.id] : null;
+        const aliquotaD = soma ? soma.debito : 0;
+        const aliquotaC = soma ? soma.credito : 0;
         const m = row ? calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC) : null;
         return '<tr>'+
           '<td>'+esc(p.nome)+'</td>'+
@@ -1072,11 +1085,25 @@ async function abrirHistoricoPreco(produtoId){
 
 async function carregarHistoricoPreco(){
   const { data, error } = await sb.from('precificacao_precos')
-    .select('*, precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)')
+    .select('*')
     .eq('produto_id', produtoSelecionadoPrecos.id)
     .order('elo').order('vigencia_inicio', { ascending:false });
   if(error){ $('historicoConteudo').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
   precosCache = data || [];
+
+  // Soma TODOS os tributos marcados por preço (N:N), não só o legado
+  // tributo_aplicado_id (que guarda só o primeiro marcado).
+  const precoIds = precosCache.map(r => r.id);
+  const tribLinksR = precoIds.length
+    ? await sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)').in('preco_id', precoIds)
+    : { data: [] };
+  const tributosPorPreco = {};
+  (tribLinksR.data || []).forEach(t => {
+    if(!t.precificacao_tributos) return;
+    (tributosPorPreco[t.preco_id] = tributosPorPreco[t.preco_id] || []).push(t.precificacao_tributos);
+  });
+  window.__tributosPorPrecoHistorico = tributosPorPreco;
+
   renderHistoricoTabela();
 }
 
@@ -1099,13 +1126,16 @@ function renderHistoricoTabela(){
 
     const podeEditar = souMaster || (souBackofficePrecificacao && row.status !== 'aprovado' && row.vigencia_inicio >= hoje);
     const podeExcluir = souMaster;
-    const aliquotaD = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
-    const aliquotaC = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
+    const tribs = (window.__tributosPorPrecoHistorico && window.__tributosPorPrecoHistorico[row.id]) || [];
+    const aliquotaD = tribs.reduce((s,t) => s + (Number(t.aliquota)||0), 0);
+    const aliquotaC = tribs.reduce((s,t) => s + (Number(t.aliquota_credito)||0), 0);
     const m = calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC);
-    const tributoTxt = row.precificacao_tributos ? esc(row.precificacao_tributos.tipo_tributo)+' ('+fmtPct(row.precificacao_tributos.aliquota)+(aliquotaC>0?', créd. '+fmtPct(aliquotaC):'')+')' : '—';
+    const tributoTxt = !tribs.length ? '—'
+      : tribs.length === 1 ? esc(tribs[0].tipo_tributo)+' ('+fmtPct(tribs[0].aliquota)+(Number(tribs[0].aliquota_credito)>0?', créd. '+fmtPct(tribs[0].aliquota_credito):'')+')'
+      : tribs.length+' impostos (déb. '+fmtPct(aliquotaD)+' / créd. '+fmtPct(aliquotaC)+')';
     const statusBadge = '<span class="badge badge-'+status+'">'+statusLabel+'</span>';
 
-    const searchText = (ELO_LABEL[row.elo]+' '+(row.precificacao_tributos?row.precificacao_tributos.tipo_tributo:'')+' '+fmtData(row.vigencia_inicio)+' '+row.vigencia_inicio+' '+statusLabel).toLowerCase();
+    const searchText = (ELO_LABEL[row.elo]+' '+tribs.map(t=>t.tipo_tributo).join(' ')+' '+fmtData(row.vigencia_inicio)+' '+row.vigencia_inicio+' '+statusLabel).toLowerCase();
 
     const html = '<tr>'+
       '<td><span class="badge badge-tipo">'+ELO_LABEL[row.elo]+'</span></td>'+
