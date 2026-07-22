@@ -437,6 +437,14 @@ function calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito, bas
 }
 
 function baseCreditoAtual(){
+  const custo = Number($('pcCusto').value) || 0;
+  const custoDiretoMarcado = $('pcCustoTomaCredito').checked;
+  // Modo "custo direto" tem prioridade: se a pessoa marcou que ESSE custo
+  // (sem detalhar por item) toma crédito, é isso que vale — mesmo que o
+  // produto já tenha uma composição de insumos cadastrada (ex: herdada da
+  // importação de receitas). A composição só decide o crédito quando o modo
+  // direto estiver desmarcado (aí sim soma só os insumos marcados).
+  if(custoDiretoMarcado) return custo;
   const vinculados = window.__pcInsumosVinculados || [];
   if(vinculados.length){
     return vinculados.reduce((soma, v) => {
@@ -444,8 +452,7 @@ function baseCreditoAtual(){
       return soma + v.quantidade * (v.precificacao_insumos ? Number(v.precificacao_insumos.custo_unitario) : 0);
     }, 0);
   }
-  const custo = Number($('pcCusto').value) || 0;
-  return $('pcCustoTomaCredito').checked ? custo : 0;
+  return 0;
 }
 
 function atualizarMargensModal(){
