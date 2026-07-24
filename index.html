@@ -164,7 +164,11 @@
     <div id="pdInsumosSection" style="display:none;margin-top:16px">
       <label>Composição do custo (insumos, embalagem, gelato etc. — soma automaticamente)</label>
       <div class="row" style="margin:6px 0 8px">
-        <div class="field" style="flex:2"><label>Insumo</label><select class="inp" id="pdAddInsumo"></select></div>
+        <div class="field" style="flex:2"><label>Insumo</label>
+          <input class="inp" type="text" id="pdAddInsumo_busca" list="pdAddInsumo_dl" autocomplete="off" placeholder="Digite pra buscar…">
+          <datalist id="pdAddInsumo_dl"></datalist>
+          <input type="hidden" id="pdAddInsumo">
+        </div>
         <div class="field" style="width:64px"><label>Qtd</label><input class="inp" id="pdAddInsumoQtd" type="number" min="0.01" step="0.01" value="1"></div>
         <button class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarInsumoProduto()">+ Add</button>
       </div>
@@ -270,7 +274,11 @@
       <div style="margin-top:10px;padding:12px;background:var(--creme,#faf6f0);border-radius:8px">
         <div id="pcInsumosLista" style="margin-bottom:8px"></div>
         <div class="row" style="margin-bottom:8px">
-          <div class="field" style="flex:2"><label>Insumo</label><select class="inp" id="pcAddInsumo"></select></div>
+          <div class="field" style="flex:2"><label>Insumo</label>
+            <input class="inp" type="text" id="pcAddInsumo_busca" list="pcAddInsumo_dl" autocomplete="off" placeholder="Digite pra buscar…">
+            <datalist id="pcAddInsumo_dl"></datalist>
+            <input type="hidden" id="pcAddInsumo">
+          </div>
           <div class="field" style="width:80px"><label>Qtd</label><input class="inp" id="pcAddInsumoQtd" type="number" min="0.001" step="0.001" value="1"></div>
           <button type="button" class="btn-outline btn btn-sm" style="height:38px" onclick="adicionarInsumoNoPreco()">+ Add</button>
         </div>
@@ -413,6 +421,39 @@ let souBackofficePrecificacao = false;
 let currentTab = 'produtos';
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Combo de busca: um <input list> + <datalist> que se comporta como um
+// <select> pesquisável — digita algumas letras e já filtra. O valor
+// resolvido (id de verdade) fica sempre em $(id).value, igual um select
+// normal, então o resto do código que já lê $(id).value não precisa mudar.
+const __comboMapas = {};
+const __comboWired = new Set();
+function popularComboBusca(id, itens, getRotulo, getValor, valorAtual, onResolve){
+  const busca = $(id+'_busca'), datalist = $(id+'_dl'), hidden = $(id);
+  if(!busca || !datalist || !hidden) return;
+  const mapa = {}, rotuloPorValor = {};
+  datalist.innerHTML = (itens||[]).map(it => {
+    const rot = getRotulo(it), val = String(getValor(it));
+    mapa[rot] = val; rotuloPorValor[val] = rot;
+    return '<option value="'+esc(rot)+'">';
+  }).join('');
+  __comboMapas[id] = mapa;
+  if(valorAtual != null && rotuloPorValor[String(valorAtual)]){
+    busca.value = rotuloPorValor[String(valorAtual)];
+    hidden.value = String(valorAtual);
+  } else {
+    busca.value = '';
+    hidden.value = '';
+  }
+  if(!__comboWired.has(id)){
+    busca.addEventListener('input', function(){
+      const m = __comboMapas[id] || {};
+      hidden.value = (m[busca.value] !== undefined) ? m[busca.value] : '';
+      if(onResolve) onResolve();
+    });
+    __comboWired.add(id);
+  }
+}
 function fmtData(d){ return d ? new Date(d+'T12:00').toLocaleDateString('pt-BR') : '—'; }
 function fmtMoeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
 function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })+'%'; }
@@ -665,7 +706,7 @@ async function carregarInsumosDoProduto(produtoId){
   window.__insumosCatalogoCache = todosInsumos || [];
   window.__produtoInsumosAtual = produtoId;
 
-  $('pdAddInsumo').innerHTML = (todosInsumos||[]).map(i => '<option value="'+i.id+'">'+esc(i.nome)+' ('+fmtMoeda(i.custo_unitario)+'/'+esc(i.unidade||'un')+')</option>').join('');
+  popularComboBusca('pdAddInsumo', todosInsumos, i => i.nome+' ('+fmtMoeda(i.custo_unitario)+'/'+(i.unidade||'un')+')', i => i.id);
   renderInsumosDoProdutoLista();
 }
 
@@ -712,7 +753,7 @@ async function carregarInsumosNoPreco(produtoId){
   window.__pcInsumosVinculados = vinculados || [];
   window.__pcProdutoAtual = produtoId;
 
-  $('pcAddInsumo').innerHTML = (todosInsumos||[]).map(i => '<option value="'+i.id+'">'+esc(i.nome)+' ('+fmtMoeda(i.custo_unitario)+'/'+esc(i.unidade||'un')+')</option>').join('');
+  popularComboBusca('pcAddInsumo', todosInsumos, i => i.nome+' ('+fmtMoeda(i.custo_unitario)+'/'+(i.unidade||'un')+')', i => i.id);
   renderInsumosNoPrecoLista();
 }
 
