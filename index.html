@@ -412,6 +412,7 @@ const PORTAL_URL = 'https://thiagodlborges.github.io/Sistema-Luna/';
 const $ = id => document.getElementById(id);
 
 const ELOS_POR_ORIGEM = { fabrica: ['loja_consumidor','loja_delivery'], revenda: ['loja_consumidor','loja_delivery'], consumo_loja: ['loja_consumidor','loja_delivery'] };
+const MEUS_ELOS = [...new Set(Object.values(ELOS_POR_ORIGEM).flat())]; // elos que pertencem a este módulo (loja) — usado pra restringir tributos e aprovações
 const ELO_LABEL = { fabrica_loja: 'Fábrica → Loja', loja_consumidor: 'Loja → Consumidor', compra_revenda: 'Compra → Revenda', loja_delivery: 'Loja → Delivery' };
 const ORIGEM_LABEL = { fabrica: 'Fábrica', fabrica_insumo: 'Insumo (só peso)', revenda: 'Revenda (fornecedor externo)', consumo_loja: 'Feito na loja' };
 
@@ -546,11 +547,18 @@ async function verificarAcessoEIniciar(){
 
 async function atualizarBadgePendentes(){
   const [pR, tR, cR] = await Promise.all([
-    sb.from('precificacao_precos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
-    sb.from('precificacao_tributos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
-    sb.from('precificacao_combo_precos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
+    sb.from('precificacao_precos').select('id', { count: 'exact', head: true }).eq('status', 'pendente').in('elo', MEUS_ELOS),
+    sb.from('precificacao_tributos').select('id', { count: 'exact', head: true }).eq('status', 'pendente').in('elo', MEUS_ELOS),
+    sb.from('precificacao_combo_precos').select('id, combo_id').eq('status', 'pendente'),
   ]);
-  const total = (pR.count || 0) + (tR.count || 0) + (cR.count || 0);
+  let comboCount = 0;
+  const comboIdsPend = [...new Set((cR.data || []).map(c => c.combo_id))];
+  if(comboIdsPend.length){
+    const { data: itensDosCombos } = await sb.from('precificacao_combo_itens').select('combo_id, elo').in('combo_id', comboIdsPend);
+    const combosDoMeuModulo = new Set((itensDosCombos||[]).filter(i => MEUS_ELOS.includes(i.elo)).map(i => i.combo_id));
+    comboCount = (cR.data||[]).filter(c => combosDoMeuModulo.has(c.combo_id)).length;
+  }
+  const total = (pR.count || 0) + (tR.count || 0) + comboCount;
   $('badgePendentes').innerHTML = total > 0 ? ' <span class="badge badge-pendente">'+total+'</span>' : '';
 }
 
@@ -949,7 +957,7 @@ async function renderTributos(){
 }
 
 async function carregarTributos(){
-  const { data, error } = await sb.from('precificacao_tributos').select('*').order('elo').order('categoria').order('vigencia_inicio', { ascending:false });
+  const { data, error } = await sb.from('precificacao_tributos').select('*').in('elo', MEUS_ELOS).order('elo').order('categoria').order('vigencia_inicio', { ascending:false });
   if(error){ $('tributosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
   tributosCache = data || [];
   if(!tributosCache.length){ $('tributosTabela').innerHTML = '<div class="empty">Nenhum tributo cadastrado ainda.</div>'; return; }
@@ -1880,8 +1888,8 @@ async function renderAprovacoes(){
   el.innerHTML = '<div class="loading">Carregando…</div>';
 
   const [precosR, tributosR, combosR, comboItensR, itemPrecosR] = await Promise.all([
-    sb.from('precificacao_precos').select('*, precificacao_produtos(nome), precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
-    sb.from('precificacao_tributos').select('*').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
+    sb.from('precificacao_precos').select('*, precificacao_produtos(nome), precificacao_tributos(categoria, tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).in('elo', MEUS_ELOS).order('status').order('criado_em', { ascending:false }),
+    sb.from('precificacao_tributos').select('*').in('status', ['pendente','rejeitado']).in('elo', MEUS_ELOS).order('status').order('criado_em', { ascending:false }),
     sb.from('precificacao_combo_precos').select('*, precificacao_combos(nome, tipo), precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)').in('status', ['pendente','rejeitado']).order('status').order('criado_em', { ascending:false }),
     sb.from('precificacao_combo_itens').select('*'),
     sb.from('precificacao_precos').select('*').eq('status','aprovado'),
@@ -1890,9 +1898,11 @@ async function renderAprovacoes(){
 
   const precos = precosR.data || [];
   const tributos = tributosR.data || [];
-  const combos = combosR.data || [];
   const comboItens = comboItensR.data || [];
   const itemPrecos = itemPrecosR.data || [];
+  // combo_precos não tem coluna de elo — um combo pertence a este módulo se algum item dele for de um elo do módulo loja
+  const combosDoMeuModulo = new Set(comboItens.filter(i => MEUS_ELOS.includes(i.elo)).map(i => i.combo_id));
+  const combos = (combosR.data || []).filter(c => combosDoMeuModulo.has(c.combo_id));
   const precosPend = precos.filter(p => p.status==='pendente');
   const precosRej = precos.filter(p => p.status==='rejeitado');
   const tribPend = tributos.filter(t => t.status==='pendente');
