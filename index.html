@@ -404,6 +404,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const SUPABASE_URL = 'https://pbuhwpcpdcnaheaywmdv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidWh3cGNwZGNuYWhlYXl3bWR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjU5MzksImV4cCI6MjA5MTg0MTkzOX0.Mg4PVg96ZiV3C2Rn0GLQU9c7ui_41OlU6Ldqn5jcvyY';
@@ -586,9 +587,15 @@ async function renderProdutos(){
   const el = $('mainContent');
   el.innerHTML =
     '<div class="card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">'+
         '<h2 style="margin:0">Produtos</h2>'+
-        '<button class="btn" onclick="abrirNovoProduto()">+ Novo Produto</button>'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+          '<select class="inp" id="pdCardapioElo" style="max-width:220px">'+
+            PRECOS_ELO_TABS.map(t => '<option value="'+t.elo+'">'+t.label+'</option>').join('')+
+          '</select>'+
+          '<button class="btn-outline btn btn-sm" onclick="exportarCardapioExcel()">📊 Exportar cardápio (Excel)</button>'+
+          '<button class="btn" onclick="abrirNovoProduto()">+ Novo Produto</button>'+
+        '</div>'+
       '</div>'+
       '<p class="hint">Fábrica: produto acabado (3 elos). Insumo: só vendido por peso, nunca ao consumidor (1 elo). Revenda: comprado pronto de fornecedor (2 elos). Feito na loja: montado ali, sem compra própria (2 elos).</p>'+
       '<div id="produtosTabela" class="loading">Carregando…</div>'+
@@ -602,7 +609,7 @@ function atualizarCategoriasDatalist(){
 }
 
 async function carregarProdutos(){
-  const { data, error } = await sb.from('precificacao_produtos').select('*').in('origem', ['revenda','consumo_loja']).order('categoria').order('nome');
+  const { data, error } = await sb.from('precificacao_produtos').select('*').in('origem', ['fabrica','revenda','consumo_loja']).order('categoria').order('nome');
   if(error){ $('produtosTabela').innerHTML = '<div class="empty">Erro: '+esc(error.message)+'</div>'; return; }
   produtosCache = data || [];
   atualizarCategoriasDatalist();
@@ -622,9 +629,11 @@ async function carregarProdutos(){
           '<td><span class="badge badge-tipo">'+(ORIGEM_LABEL[p.origem]||p.origem)+'</span></td>'+
           '<td>'+(p.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
           '<td style="white-space:nowrap">'+
-            '<button class="btn-outline btn btn-sm" onclick="abrirEditarProduto(\''+p.id+'\')">Editar</button> '+
-            '<button class="btn-danger" onclick="toggleAtivoProduto(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Desativar':'Reativar')+'</button> '+
-            (souMaster ? '<button class="btn-danger" onclick="excluirProduto(\''+p.id+'\')">\ud83d\uddd1\ufe0f</button>' : '')+
+            (p.origem === 'fabrica'
+              ? '<span class="hint" style="margin:0">Gerenciado no módulo Fábrica</span>'
+              : '<button class="btn-outline btn btn-sm" onclick="abrirEditarProduto(\''+p.id+'\')">Editar</button> '+
+                '<button class="btn-danger" onclick="toggleAtivoProduto(\''+p.id+'\','+(!p.ativo)+')">'+(p.ativo?'Desativar':'Reativar')+'</button> '+
+                (souMaster ? '<button class="btn-danger" onclick="excluirProduto(\''+p.id+'\')">\ud83d\uddd1\ufe0f</button>' : ''))+
           '</td>'+
         '</tr>'
       )).join('')+
@@ -633,6 +642,55 @@ async function carregarProdutos(){
 }
 
 function onOrigemProdutoChange(){} // reservado — sem dependências hoje
+
+async function exportarCardapioExcel(){
+  const elo = $('pdCardapioElo').value;
+  const btn = document.activeElement;
+  const textoOriginal = btn && btn.tagName === 'BUTTON' ? btn.textContent : null;
+  if (btn && textoOriginal) { btn.disabled = true; btn.textContent = 'Gerando…'; }
+
+  try{
+    const { data: todosPrecos, error } = await sb.from('precificacao_precos').select('*').eq('status','aprovado');
+    if(error){ alert('Erro ao carregar preços: '+error.message); return; }
+
+    const produtosAtivos = (produtosCache||[]).filter(p => p.ativo && (ELOS_POR_ORIGEM[p.origem]||[]).includes(elo));
+    const linhas = produtosAtivos.map(p => {
+      const row = precoVigenteDe(todosPrecos||[], p.id, elo);
+      return row ? { categoria: p.categoria, nome: p.nome, preco: Number(row.preco_venda) } : null;
+    }).filter(Boolean);
+
+    if(!linhas.length){ alert('Nenhum produto ativo com preço aprovado vigente pra esse elo ainda.'); return; }
+
+    const porCategoria = {};
+    linhas.forEach(l => { (porCategoria[l.categoria] = porCategoria[l.categoria] || []).push(l); });
+    const categorias = Object.keys(porCategoria).sort();
+
+    const aoa = [];
+    const linhasDePreco = []; // índices (0-based) das linhas de dados, pra formatar a coluna de preço como moeda
+    categorias.forEach(cat => {
+      aoa.push([cat.toUpperCase(), '']);
+      aoa.push(['Produto', 'Preço de Venda']);
+      porCategoria[cat].sort((a,b) => a.nome.localeCompare(b.nome)).forEach(l => {
+        aoa.push([l.nome, Number(l.preco.toFixed(2))]);
+        linhasDePreco.push(aoa.length - 1);
+      });
+      aoa.push([]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 42 }, { wch: 16 }];
+    linhasDePreco.forEach(r => {
+      const addr = XLSX.utils.encode_cell({ r, c: 1 });
+      if (ws[addr]) ws[addr].z = '"R$" #,##0.00';
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cardápio');
+    XLSX.writeFile(wb, 'cardapio-'+elo+'-'+hojeISO()+'.xlsx');
+  } finally {
+    if (btn && textoOriginal) { btn.disabled = false; btn.textContent = textoOriginal; }
+  }
+}
 
 function abrirNovoProduto(){
   produtoEditandoId = null;
