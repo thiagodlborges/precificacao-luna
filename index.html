@@ -89,6 +89,7 @@
   .mc-cell .r{font-weight:500}
   .mc-cell .p{display:block;font-size:.7rem;color:var(--text-light)}
   .mc-cell .r.neg{color:#B43C3C}
+  td.neg{color:#B43C3C;font-weight:500}
 
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,24,16,.5);z-index:500;align-items:center;justify-content:center;padding:20px}
   .modal-overlay.show{display:flex}
@@ -2132,21 +2133,38 @@ async function renderRelatorio(){
   ).join('')+'</div>';
   el.innerHTML = subnav+'<div class="loading">Carregando…</div>';
 
-  const [prodR, precoR, combosR, comboPrecosR, comboItensR] = await Promise.all([
+  const [prodR, precoR, combosR, comboPrecosR, comboItensR, tribLinksR] = await Promise.all([
     sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
     sb.from('precificacao_precos').select('*').eq('status','aprovado'),
     sb.from('precificacao_combos').select('*').eq('ativo', true),
     sb.from('precificacao_combo_precos').select('*').eq('status','aprovado'),
     sb.from('precificacao_combo_itens').select('*, precificacao_produtos(nome)'),
+    sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(aliquota, aliquota_credito)'),
   ]);
   if(prodR.error || precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
 
   const produtos = (prodR.data||[]).filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(relatorioEloAtual));
   const todosPrecos = precoR.data || [];
 
+  // Soma todos os tributos marcados por preço (N:N) — mesma lógica da aba Preços.
+  const somaTributosPorPreco = {};
+  (tribLinksR.data || []).forEach(t => {
+    if(!t.precificacao_tributos) return;
+    const s = somaTributosPorPreco[t.preco_id] || (somaTributosPorPreco[t.preco_id] = { debito:0, credito:0 });
+    s.debito += Number(t.precificacao_tributos.aliquota) || 0;
+    s.credito += Number(t.precificacao_tributos.aliquota_credito) || 0;
+  });
+
   const linhas = produtos.map(p => {
     const row = precoVigenteDe(todosPrecos, p.id, relatorioEloAtual);
-    return { categoria: p.categoria, nome: p.nome, custo: row?Number(row.custo):null, preco: row?Number(row.preco_venda):null, vigencia: row?row.vigencia_inicio:null };
+    if(!row) return { categoria: p.categoria, nome: p.nome, custo: null, preco: null, vigencia: null };
+    const soma = somaTributosPorPreco[row.id];
+    const m = calcularMargens(row.custo, row.preco_venda, soma?soma.debito:0, soma?soma.credito:0);
+    return {
+      categoria: p.categoria, nome: p.nome,
+      custo: Number(row.custo), preco: Number(row.preco_venda), vigencia: row.vigencia_inicio,
+      mcBrutaR: m.mcBrutaR, mcBrutaPct: m.mcBrutaPct, mcLiquidaR: m.mcLiquidaR, mcLiquidaPct: m.mcLiquidaPct,
+    };
   }).filter(l => l.preco != null);
 
   window.__relatorioLinhasCache = linhas;
@@ -2192,12 +2210,15 @@ async function renderRelatorio(){
         '<h2 style="margin:0">Preços vigentes — '+ELO_LABEL[relatorioEloAtual]+'</h2>'+
         '<button class="btn-outline btn btn-sm" onclick="exportarRelatorioCSV()">⬇ Exportar CSV/Excel</button>'+
       '</div>'+
-      '<p class="hint">Pronto pra usar como base do cardápio. Só entram produtos (e combos/promoções) com preço aprovado vigente hoje.</p>'+
+      '<p class="hint">Pronto pra usar como base do cardápio. Só entram produtos (e combos/promoções) com preço aprovado vigente hoje. Custo, preço e cada margem em uma coluna própria.</p>'+
     '</div>'+
     categorias.map(cat => {
       const itens = porCategoria[cat].sort((a,b) => a.nome.localeCompare(b.nome));
-      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço</th><th>Vigente desde</th></tr></thead><tbody>'+
-        itens.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.custo!=null?fmtMoeda(l.custo):'—')+'</td><td>'+fmtMoeda(l.preco)+'</td><td>'+fmtData(l.vigencia)+'</td></tr>').join('')+
+      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço</th><th>Margem Bruta (R$)</th><th>Margem Bruta (%)</th><th>Margem Líquida (R$)</th><th>Margem Líquida (%)</th><th>Vigente desde</th></tr></thead><tbody>'+
+        itens.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.custo!=null?fmtMoeda(l.custo):'—')+'</td><td>'+fmtMoeda(l.preco)+'</td>'+
+          '<td class="'+(l.mcBrutaR<0?'neg':'')+'">'+fmtMoeda(l.mcBrutaR)+'</td><td class="'+(l.mcBrutaR<0?'neg':'')+'">'+fmtPct(l.mcBrutaPct)+'</td>'+
+          '<td class="'+(l.mcLiquidaR<0?'neg':'')+'">'+fmtMoeda(l.mcLiquidaR)+'</td><td class="'+(l.mcLiquidaR<0?'neg':'')+'">'+fmtPct(l.mcLiquidaPct)+'</td>'+
+          '<td>'+fmtData(l.vigencia)+'</td></tr>').join('')+
       '</tbody></table></div></div>';
     }).join('') +
     comboSecao;
@@ -2207,13 +2228,14 @@ function exportarRelatorioCSV(){
   const linhas = window.__relatorioLinhasCache || [];
   const linhasCombo = window.__relatorioComboCache || [];
   if(!linhas.length && !linhasCombo.length) return;
-  const header = 'Categoria/Tipo;Produto;Itens;Custo;Preco;Vigente desde;Vigente ate;Status\n';
+  const header = 'Categoria/Tipo;Produto;Itens;Custo;Preco;Margem Bruta (R$);Margem Bruta (%);Margem Liquida (R$);Margem Liquida (%);Vigente desde;Vigente ate;Status\n';
+  const num = v => v!=null ? v.toFixed(2).replace('.',',') : '';
   const corpoProdutos = linhas.map(l =>
-    [l.categoria, l.nome, '', l.custo!=null?l.custo.toFixed(2).replace('.',','):'', l.preco.toFixed(2).replace('.',','), l.vigencia||'', '', 'Vigente agora']
+    [l.categoria, l.nome, '', num(l.custo), num(l.preco), num(l.mcBrutaR), num(l.mcBrutaPct), num(l.mcLiquidaR), num(l.mcLiquidaPct), l.vigencia||'', '', 'Vigente agora']
       .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
   ).join('\n');
   const corpoCombos = linhasCombo.map(l =>
-    [l.tipo==='promocao'?'Promoção':'Combo', l.nome, l.itensTxt||'', '', l.preco.toFixed(2).replace('.',','), l.vigencia||'', l.vigenciaFim||'', l.statusLabel]
+    [l.tipo==='promocao'?'Promoção':'Combo', l.nome, l.itensTxt||'', '', num(l.preco), '', '', '', '', l.vigencia||'', l.vigenciaFim||'', l.statusLabel]
       .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
   ).join('\n');
   const corpo = [corpoProdutos, corpoCombos].filter(Boolean).join('\n');
