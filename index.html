@@ -458,6 +458,17 @@ function popularComboBusca(id, itens, getRotulo, getValor, valorAtual, onResolve
 }
 function fmtData(d){ return d ? new Date(d+'T12:00').toLocaleDateString('pt-BR') : '—'; }
 function fmtMoeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+// Insumos medidos em grama (ex: custo do gelato) têm custo unitário muito pequeno
+// (poucos centavos por *quilo*); exibido em R$/g, isso arredonda pra "R$ 0,04" e
+// esconde qualquer oscilação real. Aqui só a EXIBIÇÃO muda pra R$/kg — o valor
+// armazenado e usado na precificação continua em gramas, sem alteração nenhuma.
+function fmtCustoInsumo(i){
+  const un = (i.unidade||'').trim().toLowerCase();
+  if(un === 'g'){
+    return fmtMoeda(Number(i.custo_unitario||0) * 1000) + ' /kg';
+  }
+  return fmtMoeda(i.custo_unitario) + (i.unidade ? ' /'+esc(i.unidade) : '');
+}
 function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })+'%'; }
 
 // MC Bruta é sobre o faturamento bruto (preço de venda); MC Líquida é sobre a receita líquida de impostos.
@@ -893,11 +904,11 @@ async function carregarInsumos(){
   if(!insumosCache.length){ $('insumosTabela').innerHTML = '<div class="empty">Nenhum insumo cadastrado ainda.</div>'; return; }
 
   $('insumosTabela').innerHTML =
-    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Custo unitário</th><th>Unidade</th><th>Status</th><th></th></tr></thead><tbody>'+
+    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Custo</th><th>Unidade</th><th>Status</th><th></th></tr></thead><tbody>'+
       insumosCache.map(i => (
         '<tr class="'+(i.ativo?'':'inativo')+'">'+
           '<td>'+esc(i.nome)+(i.automatico?' <span class="badge badge-tipo">🔄 Automático</span>':'')+'</td>'+
-          '<td>'+fmtMoeda(i.custo_unitario)+'</td>'+
+          '<td>'+fmtCustoInsumo(i)+'</td>'+
           '<td>'+esc(i.unidade||'—')+'</td>'+
           '<td>'+(i.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
           '<td style="white-space:nowrap">'+
