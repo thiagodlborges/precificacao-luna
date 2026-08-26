@@ -133,6 +133,7 @@
   <div class="tab" id="tabInsumos" data-tab="insumos" onclick="mudarTab('insumos')">📦 Insumos</div>
   <div class="tab" id="tabAprovacoes" data-tab="aprovacoes" onclick="mudarTab('aprovacoes')">✅ Aprovações<span id="badgePendentes"></span></div>
   <div class="tab" id="tabRelatorio" data-tab="relatorio" onclick="mudarTab('relatorio')">🧾 Relatório</div>
+  <div class="tab" id="tabConfigMargem" data-tab="configmargem" onclick="mudarTab('configmargem')">⚙ Alertas de Margem<span id="badgeAlertasMargem"></span></div>
 </nav>
 
 <main id="mainContent"><div class="loading">Carregando…</div></main>
@@ -458,6 +459,7 @@ function popularComboBusca(id, itens, getRotulo, getValor, valorAtual, onResolve
   }
 }
 function fmtData(d){ return d ? new Date(d+'T12:00').toLocaleDateString('pt-BR') : '—'; }
+function fmtDataHora(dt){ return dt ? new Date(dt).toLocaleString('pt-BR') : '—'; }
 function fmtMoeda(v){ return (Number(v)||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
 // Insumos medidos em grama (ex: custo do gelato) têm custo unitário muito pequeno
 // (poucos centavos por *quilo*); exibido em R$/g, isso arredonda pra "R$ 0,04" e
@@ -473,22 +475,39 @@ function fmtCustoInsumo(i){
 function fmtPct(v){ return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })+'%'; }
 
 // MC Bruta é sobre o faturamento bruto (preço de venda); MC Líquida é sobre a receita líquida de impostos.
-// Impostos líquidos = débito (aliquota % sobre preço de venda) − crédito (aliquota_credito % sobre custo, ex: PIS/Cofins não-cumulativo).
-function calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito, baseCredito){
+// IPI é calculado "por fora" (somado ao preço) e NÃO compõe a receita da empresa — por isso
+// primeiro extraímos o valor da mercadoria sem o IPI embutido no preço de venda. Os demais
+// tributos (ICMS, PIS/Cofins) incidem em cascata: cada um reduz a base do próximo, na ordem
+// em que aparecem no array `tributos` — não é uma soma de alíquotas aplicada de uma vez só.
+// Crédito de imposto continua sendo aplicado como desconto sobre o total de débitos, com base
+// no custo (mecanismo já existente, sem mudança).
+// `tributos`: array de {tipo_tributo, aliquota, aliquota_credito}.
+function calcularMargens(custo, precoVenda, tributos, baseCredito){
   custo = Number(custo)||0;
   precoVenda = Number(precoVenda)||0;
-  aliquotaDebito = Number(aliquotaDebito)||0;
-  aliquotaCredito = Number(aliquotaCredito)||0;
+  tributos = Array.isArray(tributos) ? tributos : [];
   baseCredito = baseCredito == null ? custo : Number(baseCredito)||0;
-  const debito = precoVenda * (aliquotaDebito/100);
+
+  const aliquotaIPI = tributos.filter(t => (t.tipo_tributo||'').toUpperCase()==='IPI').reduce((s,t) => s+Number(t.aliquota||0), 0);
+  const valorSemIPI = aliquotaIPI > 0 ? precoVenda / (1 + aliquotaIPI/100) : precoVenda;
+  const ipiValor = precoVenda - valorSemIPI;
+
+  let base = valorSemIPI, debito = 0, aliquotaCredito = 0;
+  tributos.filter(t => (t.tipo_tributo||'').toUpperCase()!=='IPI').forEach(t => {
+    const v = base * (Number(t.aliquota||0)/100);
+    debito += v;
+    base -= v;
+    aliquotaCredito += Number(t.aliquota_credito||0);
+  });
+
   const credito = baseCredito * (aliquotaCredito/100);
   const impostos = debito - credito;
-  const receitaLiquida = precoVenda - impostos;
+  const receitaLiquida = valorSemIPI - impostos;
   const mcBrutaR = precoVenda - custo;
   const mcBrutaPct = precoVenda > 0 ? (mcBrutaR/precoVenda*100) : 0;
   const mcLiquidaR = receitaLiquida - custo;
   const mcLiquidaPct = receitaLiquida > 0 ? (mcLiquidaR/receitaLiquida*100) : 0;
-  return { debito, credito, impostos, receitaLiquida, mcBrutaR, mcBrutaPct, mcLiquidaR, mcLiquidaPct };
+  return { debito, credito, impostos, receitaLiquida, mcBrutaR, mcBrutaPct, mcLiquidaR, mcLiquidaPct, ipiValor, valorSemIPI, aliquotaDebito: tributos.reduce((s,t)=>s+Number(t.aliquota||0),0), aliquotaCredito };
 }
 
 function baseCreditoAtual(){
@@ -516,14 +535,15 @@ function atualizarMargensModal(){
   const custo = $('pcCusto').value;
   const precoVenda = $('pcPrecoVenda').value;
   const checks = [...document.querySelectorAll('.pc-tributo-check:checked')];
-  const aliquotaDebito = checks.reduce((s,c) => s + Number(c.dataset.aliquota||0), 0);
-  const aliquotaCredito = checks.reduce((s,c) => s + Number(c.dataset.aliquotaCredito||0), 0);
+  const tributos = checks.map(c => ({ tipo_tributo: c.dataset.tipo||'', aliquota: Number(c.dataset.aliquota||0), aliquota_credito: Number(c.dataset.aliquotaCredito||0) }));
   const baseCredito = baseCreditoAtual();
-  const m = calcularMargens(custo, precoVenda, aliquotaDebito, aliquotaCredito, baseCredito);
+  const m = calcularMargens(custo, precoVenda, tributos, baseCredito);
   const impostosLbl = checks.length
-    ? (checks.length===1 ? checks[0].parentElement.textContent.split('—')[0].trim() : checks.length+' impostos')+' — déb. '+fmtPct(aliquotaDebito)+(aliquotaCredito>0?' / créd. '+fmtPct(aliquotaCredito):'')
+    ? (checks.length===1 ? checks[0].parentElement.textContent.split('—')[0].trim() : checks.length+' impostos')+' — déb. '+fmtPct(m.aliquotaDebito)+(m.aliquotaCredito>0?' / créd. '+fmtPct(m.aliquotaCredito):'')
     : 'Impostos (nenhum selecionado)';
+  const ipiLinha = m.ipiValor > 0.001 ? '<div class="margem-item"><div class="lbl">IPI (não compõe receita)</div><div class="val">'+fmtMoeda(m.ipiValor)+'</div></div>' : '';
   grid.innerHTML =
+    ipiLinha+
     '<div class="margem-item"><div class="lbl">'+impostosLbl+'</div><div class="val">'+fmtMoeda(m.impostos)+'</div></div>'+
     '<div class="margem-item"><div class="lbl">Receita Líquida</div><div class="val">'+fmtMoeda(m.receitaLiquida)+'</div></div>'+
     '<div class="margem-item"><div class="lbl">MC Bruta (s/ faturamento)</div><div class="val'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'<span class="pct">'+fmtPct(m.mcBrutaPct)+'</span></div></div>'+
@@ -555,7 +575,13 @@ async function verificarAcessoEIniciar(){
   document.getElementById('carregandoOverlay').remove();
   renderTab();
   atualizarBadgePendentes();
+  atualizarBadgeAlertasMargem();
   sb.rpc('atualizar_custo_gelato_insumo').then(({error}) => { if(error) console.error('Erro ao atualizar custo do gelato:', error.message); });
+}
+
+async function atualizarBadgeAlertasMargem(){
+  const { count } = await sb.from('precificacao_alertas_margem').select('id', { count: 'exact', head: true }).eq('lido', false);
+  $('badgeAlertasMargem').innerHTML = count > 0 ? ' <span class="badge badge-pendente">'+count+'</span>' : '';
 }
 
 async function atualizarBadgePendentes(){
@@ -589,6 +615,7 @@ function renderTab(){
   else if(currentTab==='insumos') renderInsumos();
   else if(currentTab==='aprovacoes') renderAprovacoes();
   else if(currentTab==='relatorio') renderRelatorio();
+  else if(currentTab==='configmargem') renderConfigMargem();
 }
 
 // ── PRODUTOS ───────────────────────────────────────────────
@@ -1142,7 +1169,7 @@ async function renderPrecos(){
     const [prodR, precoR, tribLinksR] = await Promise.all([
       sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
       sb.from('precificacao_precos').select('*'),
-      sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(aliquota, aliquota_credito)'),
+      sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)'),
     ]);
     if(prodR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro: '+esc(prodR.error.message)+'</div></div>'; return; }
     if(precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro: '+esc(precoR.error.message)+'</div></div>'; return; }
@@ -1155,9 +1182,7 @@ async function renderPrecos(){
     const somaTributosPorPreco = {};
     (tribLinksR.data || []).forEach(t => {
       if(!t.precificacao_tributos) return;
-      const s = somaTributosPorPreco[t.preco_id] || (somaTributosPorPreco[t.preco_id] = { debito:0, credito:0 });
-      s.debito += Number(t.precificacao_tributos.aliquota) || 0;
-      s.credito += Number(t.precificacao_tributos.aliquota_credito) || 0;
+      (somaTributosPorPreco[t.preco_id] = somaTributosPorPreco[t.preco_id] || []).push(t.precificacao_tributos);
     });
     window.__produtosAtivosCache = produtos;
     window.__todosPrecosCache = todosPrecos;
@@ -1174,10 +1199,8 @@ async function renderPrecos(){
     el.innerHTML = subnav + categorias.map(cat => {
       const linhas = porCategoria[cat].map(p => {
         const row = precoVigenteDe(todosPrecos, p.id, precosEloAtual);
-        const soma = row ? somaTributosPorPreco[row.id] : null;
-        const aliquotaD = soma ? soma.debito : 0;
-        const aliquotaC = soma ? soma.credito : 0;
-        const m = row ? calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC) : null;
+        const tributosPreco = row ? (somaTributosPorPreco[row.id] || []) : [];
+        const m = row ? calcularMargens(row.custo, row.preco_venda, tributosPreco) : null;
         return '<tr>'+
           '<td>'+esc(p.nome)+'</td>'+
           '<td>'+(row?fmtMoeda(row.custo):'—')+'</td>'+
@@ -1255,7 +1278,7 @@ function renderHistoricoTabela(){
     const tribs = (window.__tributosPorPrecoHistorico && window.__tributosPorPrecoHistorico[row.id]) || [];
     const aliquotaD = tribs.reduce((s,t) => s + (Number(t.aliquota)||0), 0);
     const aliquotaC = tribs.reduce((s,t) => s + (Number(t.aliquota_credito)||0), 0);
-    const m = calcularMargens(row.custo, row.preco_venda, aliquotaD, aliquotaC);
+    const m = calcularMargens(row.custo, row.preco_venda, tribs);
     const tributoTxt = !tribs.length ? '—'
       : tribs.length === 1 ? esc(tribs[0].tipo_tributo)+' ('+fmtPct(tribs[0].aliquota)+(Number(tribs[0].aliquota_credito)>0?', créd. '+fmtPct(tribs[0].aliquota_credito):'')+')'
       : tribs.length+' impostos (déb. '+fmtPct(aliquotaD)+' / créd. '+fmtPct(aliquotaC)+')';
@@ -1303,7 +1326,7 @@ async function popularTributosCheckboxDoElo(elo, selecionadosIds){
   wrap.innerHTML = aviso + (!lista.length ? '<p class="hint">Nenhum imposto cadastrado pra esse elo ainda.</p>' :
     lista.map(t => (
       '<label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;font-size:.85rem">'+
-        '<input type="checkbox" class="pc-tributo-check" value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(selecionadosIds.includes(t.id)?' checked':'')+' onchange="atualizarMargensModal()" style="width:16px;height:16px">'+
+        '<input type="checkbox" class="pc-tributo-check" value="'+t.id+'" data-tipo="'+esc(t.tipo_tributo)+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'"'+(selecionadosIds.includes(t.id)?' checked':'')+' onchange="atualizarMargensModal()" style="width:16px;height:16px">'+
         esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+(Number(t.aliquota_credito)>0?', créd. '+fmtPct(t.aliquota_credito):'')+(t.status!=='aprovado'?' — '+t.status:'')+')'+
       '</label>'
     )).join(''));
@@ -1556,9 +1579,8 @@ async function renderCombos(){
 
     let mc = null, alerta = { descontoPct:0, nivel:null };
     if(precoVigente){
-      const aliquotaD = precoVigente.precificacao_tributos ? Number(precoVigente.precificacao_tributos.aliquota) : 0;
-      const aliquotaC = precoVigente.precificacao_tributos ? Number(precoVigente.precificacao_tributos.aliquota_credito) : 0;
-      mc = calcularMargens(custoTotal, precoVigente.preco_combo, aliquotaD, aliquotaC);
+      const tribsCombo = precoVigente.precificacao_tributos ? [precoVigente.precificacao_tributos] : [];
+      mc = calcularMargens(custoTotal, precoVigente.preco_combo, tribsCombo);
       alerta = calcularAlertaCombo(somaIndividual, precoVigente.preco_combo);
     }
 
@@ -1630,8 +1652,8 @@ async function abrirNovoCombo(){
   onProdutoComboChange();
   renderComboItensLista();
 
-  $('cbTributo').innerHTML = '<option value="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
-    (tributos||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'">'+ELO_LABEL[t.elo]+' — '+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
+  $('cbTributo').innerHTML = '<option value="" data-tipo="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
+    (tributos||[]).map(t => '<option value="'+t.id+'" data-tipo="'+esc(t.tipo_tributo)+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'">'+ELO_LABEL[t.elo]+' — '+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
 
   atualizarResumoCombo();
   $('modalCombo').classList.add('show');
@@ -1678,9 +1700,8 @@ function atualizarResumoCombo(){
   const precoCombo = Number($('cbPreco').value)||0;
   const sel = $('cbTributo');
   const opt = sel ? sel.options[sel.selectedIndex] : null;
-  const aliquotaD = opt ? Number(opt.dataset.aliquota||0) : 0;
-  const aliquotaC = opt ? Number(opt.dataset.aliquotaCredito||0) : 0;
-  const m = calcularMargens(custo, precoCombo, aliquotaD, aliquotaC);
+  const tribsCombo = (opt && opt.dataset.tipo) ? [{ tipo_tributo: opt.dataset.tipo, aliquota: Number(opt.dataset.aliquota||0), aliquota_credito: Number(opt.dataset.aliquotaCredito||0) }] : [];
+  const m = calcularMargens(custo, precoCombo, tribsCombo);
   const alerta = calcularAlertaCombo(soma, precoCombo);
   grid.innerHTML =
     '<div class="margem-item"><div class="lbl">Soma dos itens individuais</div><div class="val">'+fmtMoeda(soma)+'</div></div>'+
@@ -1852,9 +1873,8 @@ async function renderHistoricoComboTabela(){
       else { status='historico'; statusLabel='Histórico'; }
     }
     const podeExcluir = souMaster;
-    const aliquotaD = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota) : 0;
-    const aliquotaC = row.precificacao_tributos ? Number(row.precificacao_tributos.aliquota_credito) : 0;
-    const m = calcularMargens(custo, row.preco_combo, aliquotaD, aliquotaC);
+    const tribsRow = row.precificacao_tributos ? [row.precificacao_tributos] : [];
+    const m = calcularMargens(custo, row.preco_combo, tribsRow);
     const alerta = calcularAlertaCombo(soma, row.preco_combo);
 
     return '<tr>'+
@@ -1890,8 +1910,8 @@ async function abrirNovoPrecoCombo(){
   showMsg('precoComboMsg','','');
 
   const { data: tributos } = await sb.from('precificacao_tributos').select('*').eq('status','aprovado').order('elo').order('categoria');
-  $('pcComboTributo').innerHTML = '<option value="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
-    (tributos||[]).map(t => '<option value="'+t.id+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'">'+ELO_LABEL[t.elo]+' — '+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
+  $('pcComboTributo').innerHTML = '<option value="" data-tipo="" data-aliquota="0" data-aliquota-credito="0">— nenhum —</option>'+
+    (tributos||[]).map(t => '<option value="'+t.id+'" data-tipo="'+esc(t.tipo_tributo)+'" data-aliquota="'+t.aliquota+'" data-aliquota-credito="'+(t.aliquota_credito||0)+'">'+ELO_LABEL[t.elo]+' — '+esc(t.categoria)+' — '+esc(t.tipo_tributo)+' ('+fmtPct(t.aliquota)+')</option>').join('');
 
   await atualizarResumoPrecoCombo();
   $('modalPrecoCombo').classList.add('show');
@@ -1904,9 +1924,8 @@ async function atualizarResumoPrecoCombo(){
   const precoCombo = Number($('pcComboPreco').value)||0;
   const sel = $('pcComboTributo');
   const opt = sel ? sel.options[sel.selectedIndex] : null;
-  const aliquotaD = opt ? Number(opt.dataset.aliquota||0) : 0;
-  const aliquotaC = opt ? Number(opt.dataset.aliquotaCredito||0) : 0;
-  const m = calcularMargens(custo, precoCombo, aliquotaD, aliquotaC);
+  const tribsCombo = (opt && opt.dataset.tipo) ? [{ tipo_tributo: opt.dataset.tipo, aliquota: Number(opt.dataset.aliquota||0), aliquota_credito: Number(opt.dataset.aliquotaCredito||0) }] : [];
+  const m = calcularMargens(custo, precoCombo, tribsCombo);
   const alerta = calcularAlertaCombo(soma, precoCombo);
   grid.innerHTML =
     '<div class="margem-item"><div class="lbl">Soma dos itens individuais</div><div class="val">'+fmtMoeda(soma)+'</div></div>'+
@@ -2139,7 +2158,7 @@ async function renderRelatorio(){
     sb.from('precificacao_combos').select('*').eq('ativo', true),
     sb.from('precificacao_combo_precos').select('*').eq('status','aprovado'),
     sb.from('precificacao_combo_itens').select('*, precificacao_produtos(nome)'),
-    sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(aliquota, aliquota_credito)'),
+    sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)'),
   ]);
   if(prodR.error || precoR.error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
 
@@ -2150,16 +2169,14 @@ async function renderRelatorio(){
   const somaTributosPorPreco = {};
   (tribLinksR.data || []).forEach(t => {
     if(!t.precificacao_tributos) return;
-    const s = somaTributosPorPreco[t.preco_id] || (somaTributosPorPreco[t.preco_id] = { debito:0, credito:0 });
-    s.debito += Number(t.precificacao_tributos.aliquota) || 0;
-    s.credito += Number(t.precificacao_tributos.aliquota_credito) || 0;
+    (somaTributosPorPreco[t.preco_id] = somaTributosPorPreco[t.preco_id] || []).push(t.precificacao_tributos);
   });
 
   const linhas = produtos.map(p => {
     const row = precoVigenteDe(todosPrecos, p.id, relatorioEloAtual);
     if(!row) return { categoria: p.categoria, nome: p.nome, custo: null, preco: null, vigencia: null };
-    const soma = somaTributosPorPreco[row.id];
-    const m = calcularMargens(row.custo, row.preco_venda, soma?soma.debito:0, soma?soma.credito:0);
+    const tributosPreco = somaTributosPorPreco[row.id] || [];
+    const m = calcularMargens(row.custo, row.preco_venda, tributosPreco);
     return {
       categoria: p.categoria, nome: p.nome,
       custo: Number(row.custo), preco: Number(row.preco_venda), vigencia: row.vigencia_inicio,
@@ -2244,6 +2261,79 @@ function exportarRelatorioCSV(){
   a.href = URL.createObjectURL(blob);
   a.download = 'precos-'+relatorioEloAtual+'-'+hojeISO()+'.csv';
   a.click();
+}
+
+// ── ALERTAS DE MARGEM (config do patamar mínimo + fila de avisos) ──
+async function renderConfigMargem(){
+  const el = $('mainContent');
+  el.innerHTML = '<div class="card"><div class="loading">Carregando…</div></div>';
+
+  const [{ data: config }, { data: alertas, error }] = await Promise.all([
+    sb.from('precificacao_configuracoes').select('*').eq('id', 1).single(),
+    sb.from('precificacao_alertas_margem').select('*').order('lido').order('criado_em', { ascending:false }).limit(200),
+  ]);
+
+  if(error){ el.innerHTML = '<div class="card"><div class="empty">Erro ao carregar: '+esc(error.message)+'</div></div>'; return; }
+
+  const margemAtual = config ? Number(config.margem_minima_pct) : 30;
+  const naoLidos = (alertas||[]).filter(a => !a.lido);
+  const lidos = (alertas||[]).filter(a => a.lido);
+
+  el.innerHTML = `<div class="card">
+    <h2>Patamar mínimo de margem líquida</h2>
+    <p class="hint">Este patamar é compartilhado com o módulo da Fábrica. Sempre que o custo de um produto sobe (por composição de matéria-prima, atualizada automaticamente) e a margem líquida cai abaixo desse valor, um alerta é gerado aqui.</p>
+    <div class="row" style="align-items:flex-end;gap:12px">
+      <div class="field"><label>Margem mínima aceitável (%)</label><input type="number" step="0.1" class="inp" id="cfgMargemMinima" value="${margemAtual}" style="width:140px" ${souMaster?'':'disabled'}></div>
+      ${souMaster ? '<button class="btn" onclick="salvarMargemMinima()">Salvar</button>' : '<span class="hint" style="margin:0">Só o master pode alterar este valor.</span>'}
+    </div>
+    <div id="cfgMargemMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Alertas pendentes ${naoLidos.length ? '<span class="badge badge-pendente">'+naoLidos.length+'</span>' : ''}</h2>
+    ${!naoLidos.length ? '<div class="empty">Nenhum alerta pendente. 🎉</div>' : `
+    <div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo antes → depois</th><th>Margem antes → depois</th><th>Patamar</th><th>Quando</th><th></th></tr></thead><tbody>
+      ${naoLidos.map(a => `<tr>
+        <td>${esc(a.nome_produto)}${a.categoria?' <span class="hint" style="margin:0">('+esc(a.categoria)+')</span>':''}</td>
+        <td><span class="badge badge-tipo">${ELO_LABEL[a.elo]||esc(a.elo)}</span></td>
+        <td>${fmtMoeda(a.custo_anterior)} → <strong>${fmtMoeda(a.custo_novo)}</strong></td>
+        <td class="neg">${a.margem_anterior_pct!=null?fmtPct(a.margem_anterior_pct):'—'} → <strong>${fmtPct(a.margem_nova_pct)}</strong></td>
+        <td>${fmtPct(a.margem_minima_pct)}</td>
+        <td>${fmtDataHora(a.criado_em)}</td>
+        <td><button class="btn-outline btn btn-sm" onclick="marcarAlertaLido(${a.id})">Marcar como lido</button></td>
+      </tr>`).join('')}
+    </tbody></table></div>`}
+  </div>
+
+  ${lidos.length ? `<div class="card">
+    <h2>Histórico (já lidos)</h2>
+    <div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Elo</th><th>Custo antes → depois</th><th>Margem antes → depois</th><th>Quando</th></tr></thead><tbody>
+      ${lidos.map(a => `<tr class="inativo">
+        <td>${esc(a.nome_produto)}</td>
+        <td><span class="badge badge-tipo">${ELO_LABEL[a.elo]||esc(a.elo)}</span></td>
+        <td>${fmtMoeda(a.custo_anterior)} → ${fmtMoeda(a.custo_novo)}</td>
+        <td>${a.margem_anterior_pct!=null?fmtPct(a.margem_anterior_pct):'—'} → ${fmtPct(a.margem_nova_pct)}</td>
+        <td>${fmtDataHora(a.criado_em)}</td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  </div>` : ''}`;
+}
+
+async function salvarMargemMinima(){
+  const valor = Number($('cfgMargemMinima').value);
+  if(isNaN(valor) || valor < 0 || valor > 100){ showMsg('cfgMargemMsg','Informe um percentual válido (0 a 100).','err'); return; }
+  const { error } = await sb.from('precificacao_configuracoes').update({
+    margem_minima_pct: valor, atualizado_por: meuPerfil.id, atualizado_por_nome: meuPerfil.nome, atualizado_em: new Date().toISOString()
+  }).eq('id', 1);
+  if(error){ showMsg('cfgMargemMsg','Erro ao salvar: '+error.message,'err'); return; }
+  showMsg('cfgMargemMsg','Patamar salvo — vale a partir de agora pros próximos alertas.','ok');
+}
+
+async function marcarAlertaLido(id){
+  const { error } = await sb.from('precificacao_alertas_margem').update({ lido: true }).eq('id', id);
+  if(error){ alert('Erro ao marcar como lido: '+error.message); return; }
+  renderConfigMargem();
+  atualizarBadgeAlertasMargem();
 }
 
 verificarAcessoEIniciar();
