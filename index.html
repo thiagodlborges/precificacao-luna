@@ -133,6 +133,7 @@
   <div class="tab" id="tabInsumos" data-tab="insumos" onclick="mudarTab('insumos')">📦 Insumos</div>
   <div class="tab" id="tabAprovacoes" data-tab="aprovacoes" onclick="mudarTab('aprovacoes')">✅ Aprovações<span id="badgePendentes"></span></div>
   <div class="tab" id="tabRelatorio" data-tab="relatorio" onclick="mudarTab('relatorio')">🧾 Relatório</div>
+  <div class="tab" id="tabVariacaoCustos" data-tab="variacaocustos" onclick="mudarTab('variacaocustos')">📈 Variação de Custos</div>
   <div class="tab" id="tabConfigMargem" data-tab="configmargem" onclick="mudarTab('configmargem')">⚙ Alertas de Margem<span id="badgeAlertasMargem"></span></div>
 </nav>
 
@@ -615,6 +616,7 @@ function renderTab(){
   else if(currentTab==='insumos') renderInsumos();
   else if(currentTab==='aprovacoes') renderAprovacoes();
   else if(currentTab==='relatorio') renderRelatorio();
+  else if(currentTab==='variacaocustos') renderVariacaoCustos();
   else if(currentTab==='configmargem') renderConfigMargem();
 }
 
@@ -2334,6 +2336,112 @@ async function marcarAlertaLido(id){
   if(error){ alert('Erro ao marcar como lido: '+error.message); return; }
   renderConfigMargem();
   atualizarBadgeAlertasMargem();
+}
+
+// ── VARIAÇÃO DE CUSTOS (últimos 30 dias) ──────────────────
+// Mostra, por produto, como o custo andou nos últimos 30 dias — inclui edição
+// manual e as atualizações automáticas (composição de matéria-prima e a média
+// ponderada do gelato, que reflete aqui nos itens "consumo_loja").
+let variacaoCustosCache = [];
+let variacaoCustosEloAtual = 'loja_consumidor';
+
+function mudarVariacaoCustosElo(elo){
+  variacaoCustosEloAtual = elo;
+  renderVariacaoCustos();
+}
+
+async function renderVariacaoCustos(){
+  const el = $('mainContent');
+  const subnav = '<div class="subnav">'+PRECOS_ELO_TABS.map(t =>
+    '<div class="subnav-item'+(t.elo===variacaoCustosEloAtual?' active':'')+'" onclick="mudarVariacaoCustosElo(\''+t.elo+'\')">'+t.label+'</div>'
+  ).join('')+'</div>';
+  el.innerHTML = subnav+'<div class="card"><div class="loading">Carregando…</div></div>';
+
+  const desde = new Date(); desde.setDate(desde.getDate() - 30);
+  const desdeStr = desde.toISOString().slice(0,10);
+
+  const { data, error } = await sb.from('precificacao_precos')
+    .select('produto_id, custo, preco_venda, vigencia_inicio, criado_em, precificacao_produtos(nome, categoria)')
+    .eq('elo', variacaoCustosEloAtual).eq('status', 'aprovado')
+    .gte('vigencia_inicio', desdeStr)
+    .order('vigencia_inicio');
+
+  if(error){ el.innerHTML = subnav+'<div class="card"><div class="empty">Erro ao carregar: '+esc(error.message)+'</div></div>'; return; }
+
+  const { data: anteriores } = await sb.from('precificacao_precos')
+    .select('produto_id, custo, vigencia_inicio')
+    .eq('elo', variacaoCustosEloAtual).eq('status', 'aprovado')
+    .lt('vigencia_inicio', desdeStr)
+    .order('vigencia_inicio', { ascending: false });
+
+  const custoAnteriorPorProduto = {};
+  (anteriores || []).forEach(r => { if(!(r.produto_id in custoAnteriorPorProduto)) custoAnteriorPorProduto[r.produto_id] = Number(r.custo); });
+
+  const porProduto = {};
+  (data || []).forEach(r => {
+    if(!r.precificacao_produtos) return;
+    const key = r.produto_id;
+    if(!porProduto[key]) porProduto[key] = { id: key, nome: r.precificacao_produtos.nome, categoria: r.precificacao_produtos.categoria, historico: [] };
+    porProduto[key].historico.push({ custo: Number(r.custo), data: r.vigencia_inicio, criado_em: r.criado_em });
+  });
+
+  const linhas = Object.values(porProduto).map(p => {
+    const custoInicial = p.id in custoAnteriorPorProduto ? custoAnteriorPorProduto[p.id] : p.historico[0].custo;
+    const custoAtual = p.historico[p.historico.length-1].custo;
+    const diffR = custoAtual - custoInicial;
+    const diffPct = custoInicial > 0 ? (diffR/custoInicial*100) : 0;
+    return { ...p, custoInicial, custoAtual, diffR, diffPct };
+  }).filter(l => Math.abs(l.diffR) > 0.0001)
+    .sort((a,b) => Math.abs(b.diffPct) - Math.abs(a.diffPct));
+
+  variacaoCustosCache = linhas;
+
+  if(!linhas.length){
+    el.innerHTML = subnav+'<div class="card"><h2>Variação de Custos — Últimos 30 dias</h2><div class="empty">Nenhuma mudança de custo nesse elo nos últimos 30 dias.</div></div>';
+    return;
+  }
+
+  el.innerHTML = subnav+`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0">Variação de Custos — Últimos 30 dias — ${ELO_LABEL[variacaoCustosEloAtual]}</h2>
+      <button class="btn-outline btn btn-sm" onclick="exportarVariacaoCustosCSV()">⬇ Exportar CSV</button>
+    </div>
+    <p class="hint">Compara o custo de referência (antes da janela de 30 dias) com o valor atual. Inclui edição manual e atualizações automáticas — como a média ponderada do gelato, que reflete no custo dos itens "consumo_loja" (Copinho, Casquinha, Cascão, etc.). Ordenado pela maior variação percentual.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Categoria</th><th>Produto</th><th>Custo há 30 dias</th><th>Custo atual</th><th>Variação (R$)</th><th>Variação (%)</th><th></th></tr></thead><tbody>
+      ${linhas.map((l,i) => `<tr>
+        <td>${esc(l.categoria)}</td>
+        <td>${esc(l.nome)}</td>
+        <td>${fmtMoeda(l.custoInicial)}</td>
+        <td>${fmtMoeda(l.custoAtual)}</td>
+        <td class="${l.diffR<0?'neg':''}">${l.diffR>0?'+':''}${fmtMoeda(l.diffR)}</td>
+        <td class="${l.diffPct<0?'neg':''}">${l.diffPct>0?'+':''}${fmtPct(l.diffPct)}</td>
+        <td><button class="btn-outline btn btn-sm" onclick="toggleHistoricoCusto(${i})">Ver linha do tempo</button></td>
+      </tr>
+      <tr id="historicoCusto_${i}" style="display:none"><td colspan="7" style="background:var(--creme)">
+        ${l.historico.map(h => '<span style="display:inline-block;margin:2px 10px 2px 0;font-size:.8rem">'+fmtData(h.data)+': <strong>'+fmtMoeda(h.custo)+'</strong></span>').join('')}
+      </td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+function toggleHistoricoCusto(i){
+  const row = $('historicoCusto_'+i);
+  row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function exportarVariacaoCustosCSV(){
+  if(!variacaoCustosCache.length) return;
+  const num = v => v.toFixed(4).replace('.',',');
+  const header = 'Categoria;Produto;Custo ha 30 dias;Custo atual;Variacao (R$);Variacao (%)\n';
+  const corpo = variacaoCustosCache.map(l =>
+    [l.categoria, l.nome, num(l.custoInicial), num(l.custoAtual), num(l.diffR), num(l.diffPct)]
+      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
+  ).join('\n');
+  const blob = new Blob(['\uFEFF'+header+corpo], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'variacao-custos-30dias-'+variacaoCustosEloAtual+'-'+hojeISO()+'.csv';
+  a.click();
 }
 
 verificarAcessoEIniciar();
