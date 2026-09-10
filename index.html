@@ -135,6 +135,7 @@
   <div class="tab" id="tabRelatorio" data-tab="relatorio" onclick="mudarTab('relatorio')">🧾 Relatório</div>
   <div class="tab" id="tabVariacaoCustos" data-tab="variacaocustos" onclick="mudarTab('variacaocustos')">📈 Variação de Custos</div>
   <div class="tab" id="tabConfigMargem" data-tab="configmargem" onclick="mudarTab('configmargem')">⚙ Alertas de Margem<span id="badgeAlertasMargem"></span></div>
+  <div class="tab" id="tabFidelidade" data-tab="fidelidade" onclick="mudarTab('fidelidade')">🎯 Pontos e Resgate</div>
 </nav>
 
 <main id="mainContent"><div class="loading">Carregando…</div></main>
@@ -163,6 +164,10 @@
     <label id="pdAtivoWrap" style="display:none;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">
       <input type="checkbox" id="pdAtivo" style="width:16px;height:16px" checked> Produto ativo
     </label>
+    <label id="pdDisponivelWrap" style="display:none;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;margin-top:8px">
+      <input type="checkbox" id="pdDisponivel" style="width:16px;height:16px"> Disponível para pedido de loja
+    </label>
+    <p class="hint" id="pdDisponivelHint" style="display:none;margin-top:2px">Controla se esse produto aparece no formulário de pedido que as lojas usam pra repor com a fábrica. "Ativo" sozinho não é suficiente — os dois precisam estar marcados.</p>
 
     <div id="pdInsumosSection" style="display:none;margin-top:16px">
       <label>Composição do custo (insumos, embalagem, gelato etc. — soma automaticamente)</label>
@@ -422,6 +427,7 @@ const ORIGEM_LABEL = { fabrica: 'Fábrica', fabrica_insumo: 'Insumo (só peso)',
 
 let meuPerfil = null;
 let souMaster = false;
+let souMarketing = false;
 let souBackofficePrecificacao = false;
 let currentTab = 'produtos';
 
@@ -568,8 +574,20 @@ async function verificarAcessoEIniciar(){
 
   souMaster = perfil.tipo === 'master';
   const souBackoffice = souMaster || perfil.precificacao_loja_backoffice === true;
-  if (!souBackoffice) { await sb.auth.signOut(); window.location.href = PORTAL_URL; return; }
+  souMarketing = souMaster || perfil.marketing_backoffice === true;
+  if (!souBackoffice && !souMarketing) { await sb.auth.signOut(); window.location.href = PORTAL_URL; return; }
   souBackofficePrecificacao = souBackoffice;
+
+  // Quem só tem acesso de marketing (ex: agência externa) entra só pra
+  // mexer na conversão de pontos — não vê Produtos, Preços, Tributos etc.,
+  // que são dados sensíveis de custo/margem da operação.
+  if (!souBackoffice && souMarketing) {
+    document.querySelectorAll('nav.tabs .tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('nav.tabs .tab').forEach(t => t.style.display = 'none');
+    $('tabFidelidade').style.display = '';
+    $('tabFidelidade').classList.add('active');
+    currentTab = 'fidelidade';
+  }
 
   meuPerfil = perfil;
   document.getElementById('appRoot').style.display = 'block';
@@ -618,6 +636,7 @@ function renderTab(){
   else if(currentTab==='relatorio') renderRelatorio();
   else if(currentTab==='variacaocustos') renderVariacaoCustos();
   else if(currentTab==='configmargem') renderConfigMargem();
+  else if(currentTab==='fidelidade') renderFidelidade();
 }
 
 // ── PRODUTOS ───────────────────────────────────────────────
@@ -663,11 +682,14 @@ async function carregarProdutos(){
   $('produtosTabela').innerHTML = categorias.map(cat => {
     const itens = porCategoria[cat];
     return '<h2 style="margin:20px 0 8px">'+esc(cat)+'</h2>'+
-    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Origem</th><th>Status</th><th></th></tr></thead><tbody>'+
+    '<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Origem</th><th>Pedido de loja</th><th>Status</th><th></th></tr></thead><tbody>'+
       itens.map(p => (
         '<tr class="'+(p.ativo?'':'inativo')+'">'+
           '<td>'+esc(p.nome)+'</td>'+
           '<td><span class="badge badge-tipo">'+(ORIGEM_LABEL[p.origem]||p.origem)+'</span></td>'+
+          '<td>'+(p.origem === 'fabrica'
+            ? '<span class="hint" style="margin:0">Gerenciado no módulo Fábrica</span>'
+            : '<span class="badge '+(p.disponivel_pedido_loja?'badge-ativo':'badge-inativo')+'" style="cursor:pointer" title="Clique pra alternar" onclick="toggleDisponivelProduto(\''+p.id+'\','+(!p.disponivel_pedido_loja)+')">'+(p.disponivel_pedido_loja?'✅ Disponível':'— Indisponível')+'</span>')+'</td>'+
           '<td>'+(p.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
           '<td style="white-space:nowrap">'+
             (p.origem === 'fabrica'
@@ -738,6 +760,7 @@ function abrirNovoProduto(){
   $('tituloProduto').textContent = 'Novo Produto';
   $('pdNome').value=''; $('pdCategoria').value=''; $('pdOrigem').value='consumo_loja';
   $('pdAtivoWrap').style.display = 'none';
+  $('pdDisponivelWrap').style.display = 'none'; $('pdDisponivelHint').style.display = 'none'; $('pdDisponivel').checked = false;
   $('pdInsumosSection').style.display = 'none';
   showMsg('produtoMsg','','');
   $('modalProduto').classList.add('show');
@@ -750,6 +773,8 @@ async function abrirEditarProduto(id){
   $('tituloProduto').textContent = 'Editar Produto';
   $('pdNome').value = p.nome; $('pdCategoria').value = p.categoria; $('pdOrigem').value = p.origem;
   $('pdAtivoWrap').style.display = 'flex'; $('pdAtivo').checked = !!p.ativo;
+  $('pdDisponivelWrap').style.display = 'flex'; $('pdDisponivelHint').style.display = 'block';
+  $('pdDisponivel').checked = !!p.disponivel_pedido_loja;
   showMsg('produtoMsg','','');
   $('modalProduto').classList.add('show');
 
@@ -774,7 +799,10 @@ async function salvarProduto(){
   if(!nome || !categoria){ showMsg('produtoMsg','Preencha nome e categoria.','err'); return; }
 
   const payload = { nome, categoria, origem };
-  if(produtoEditandoId) payload.ativo = $('pdAtivo').checked;
+  if(produtoEditandoId){
+    payload.ativo = $('pdAtivo').checked;
+    payload.disponivel_pedido_loja = $('pdDisponivel').checked;
+  }
 
   const btn = $('btnSalvarProduto');
   btn.disabled = true; btn.textContent = 'Salvando…';
@@ -782,7 +810,7 @@ async function salvarProduto(){
   if(produtoEditandoId){
     ({ error } = await sb.from('precificacao_produtos').update(payload).eq('id', produtoEditandoId));
   } else {
-    ({ error } = await sb.from('precificacao_produtos').insert({ ...payload, ativo: true }));
+    ({ error } = await sb.from('precificacao_produtos').insert({ ...payload, ativo: true, disponivel_pedido_loja: false }));
   }
   btn.disabled = false; btn.textContent = 'Salvar';
   if(error){ showMsg('produtoMsg','Erro: '+error.message,'err'); return; }
@@ -792,6 +820,12 @@ async function salvarProduto(){
 
 async function toggleAtivoProduto(id, novoValor){
   const { error } = await sb.from('precificacao_produtos').update({ ativo: novoValor }).eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  renderProdutos();
+}
+
+async function toggleDisponivelProduto(id, novoValor){
+  const { error } = await sb.from('precificacao_produtos').update({ disponivel_pedido_loja: novoValor }).eq('id', id);
   if(error){ alert('Erro: '+error.message); return; }
   renderProdutos();
 }
@@ -1169,7 +1203,7 @@ async function renderPrecos(){
 
   try {
     const [prodR, precoR, tribLinksR] = await Promise.all([
-      sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
+      sb.from('precificacao_produtos').select('*').order('categoria').order('nome'),
       sb.from('precificacao_precos').select('*'),
       sb.from('precificacao_preco_tributos').select('preco_id, precificacao_tributos(tipo_tributo, aliquota, aliquota_credito)'),
     ]);
@@ -1192,7 +1226,7 @@ async function renderPrecos(){
 
     const produtosFiltrados = produtos.filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(precosEloAtual));
 
-    if(!produtosFiltrados.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum produto ativo com esse elo ainda.</div></div>'; return; }
+    if(!produtosFiltrados.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum produto cadastrado com esse elo ainda.</div></div>'; return; }
 
     const porCategoria = {};
     produtosFiltrados.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
@@ -1203,8 +1237,8 @@ async function renderPrecos(){
         const row = precoVigenteDe(todosPrecos, p.id, precosEloAtual);
         const tributosPreco = row ? (somaTributosPorPreco[row.id] || []) : [];
         const m = row ? calcularMargens(row.custo, row.preco_venda, tributosPreco) : null;
-        return '<tr>'+
-          '<td>'+esc(p.nome)+'</td>'+
+        return '<tr class="'+(p.ativo?'':'inativo')+'">'+
+          '<td>'+esc(p.nome)+(p.ativo?'':' <span class="badge badge-inativo" style="font-size:.7em">Inativo</span>')+'</td>'+
           '<td>'+(row?fmtMoeda(row.custo):'—')+'</td>'+
           '<td>'+(row?fmtMoeda(row.preco_venda):'—')+'</td>'+
           (m ? '<td class="mc-cell"><span class="r'+(m.mcBrutaR<0?' neg':'')+'">'+fmtMoeda(m.mcBrutaR)+'</span><span class="p">'+fmtPct(m.mcBrutaPct)+'</span></td>' : '<td>—</td>')+
@@ -2155,7 +2189,7 @@ async function renderRelatorio(){
   el.innerHTML = subnav+'<div class="loading">Carregando…</div>';
 
   const [prodR, precoR, combosR, comboPrecosR, comboItensR, tribLinksR] = await Promise.all([
-    sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
+    sb.from('precificacao_produtos').select('*').order('categoria').order('nome'),
     sb.from('precificacao_precos').select('*').eq('status','aprovado'),
     sb.from('precificacao_combos').select('*').eq('ativo', true),
     sb.from('precificacao_combo_precos').select('*').eq('status','aprovado'),
@@ -2176,11 +2210,11 @@ async function renderRelatorio(){
 
   const linhas = produtos.map(p => {
     const row = precoVigenteDe(todosPrecos, p.id, relatorioEloAtual);
-    if(!row) return { categoria: p.categoria, nome: p.nome, custo: null, preco: null, vigencia: null };
+    if(!row) return { categoria: p.categoria, nome: p.nome, ativo: p.ativo, custo: null, preco: null, vigencia: null };
     const tributosPreco = somaTributosPorPreco[row.id] || [];
     const m = calcularMargens(row.custo, row.preco_venda, tributosPreco);
     return {
-      categoria: p.categoria, nome: p.nome,
+      categoria: p.categoria, nome: p.nome, ativo: p.ativo,
       custo: Number(row.custo), preco: Number(row.preco_venda), vigencia: row.vigencia_inicio,
       mcBrutaR: m.mcBrutaR, mcBrutaPct: m.mcBrutaPct, mcLiquidaR: m.mcLiquidaR, mcLiquidaPct: m.mcLiquidaPct,
     };
@@ -2233,8 +2267,10 @@ async function renderRelatorio(){
     '</div>'+
     categorias.map(cat => {
       const itens = porCategoria[cat].sort((a,b) => a.nome.localeCompare(b.nome));
-      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Custo</th><th>Preço</th><th>Margem Bruta (R$)</th><th>Margem Bruta (%)</th><th>Margem Líquida (R$)</th><th>Margem Líquida (%)</th><th>Vigente desde</th></tr></thead><tbody>'+
-        itens.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+(l.custo!=null?fmtMoeda(l.custo):'—')+'</td><td>'+fmtMoeda(l.preco)+'</td>'+
+      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Status</th><th>Custo</th><th>Preço</th><th>Margem Bruta (R$)</th><th>Margem Bruta (%)</th><th>Margem Líquida (R$)</th><th>Margem Líquida (%)</th><th>Vigente desde</th></tr></thead><tbody>'+
+        itens.map(l => '<tr class="'+(l.ativo?'':'inativo')+'"><td>'+esc(l.nome)+'</td>'+
+          '<td>'+(l.ativo?'<span class="badge badge-ativo">Ativo</span>':'<span class="badge badge-inativo">Inativo</span>')+'</td>'+
+          '<td>'+(l.custo!=null?fmtMoeda(l.custo):'—')+'</td><td>'+fmtMoeda(l.preco)+'</td>'+
           '<td class="'+(l.mcBrutaR<0?'neg':'')+'">'+fmtMoeda(l.mcBrutaR)+'</td><td class="'+(l.mcBrutaR<0?'neg':'')+'">'+fmtPct(l.mcBrutaPct)+'</td>'+
           '<td class="'+(l.mcLiquidaR<0?'neg':'')+'">'+fmtMoeda(l.mcLiquidaR)+'</td><td class="'+(l.mcLiquidaR<0?'neg':'')+'">'+fmtPct(l.mcLiquidaPct)+'</td>'+
           '<td>'+fmtData(l.vigencia)+'</td></tr>').join('')+
@@ -2247,15 +2283,20 @@ function exportarRelatorioCSV(){
   const linhas = window.__relatorioLinhasCache || [];
   const linhasCombo = window.__relatorioComboCache || [];
   if(!linhas.length && !linhasCombo.length) return;
-  const header = 'Categoria/Tipo;Produto;Itens;Custo;Preco;Margem Bruta (R$);Margem Bruta (%);Margem Liquida (R$);Margem Liquida (%);Vigente desde;Vigente ate;Status\n';
+  const header = 'Categoria/Tipo;Produto;Itens;Status;Custo;Preco;Margem Bruta (R$);Margem Bruta (%);Margem Liquida (R$);Margem Liquida (%);Vigente desde;Vigente ate\n';
+  // Campos de TEXTO ficam entre aspas; campos NUMÉRICOS saem sem aspas — aspas
+  // em número faz o Excel/Sheets importar como texto, impossibilitando soma e
+  // filtro numérico. Vírgula como decimal (padrão BR), sem ambiguidade porque
+  // o separador de campo já é ";".
+  const txt = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
   const num = v => v!=null ? v.toFixed(2).replace('.',',') : '';
   const corpoProdutos = linhas.map(l =>
-    [l.categoria, l.nome, '', num(l.custo), num(l.preco), num(l.mcBrutaR), num(l.mcBrutaPct), num(l.mcLiquidaR), num(l.mcLiquidaPct), l.vigencia||'', '', 'Vigente agora']
-      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
+    [txt(l.categoria), txt(l.nome), txt(''), txt(l.ativo?'Ativo':'Inativo'), num(l.custo), num(l.preco), num(l.mcBrutaR), num(l.mcBrutaPct), num(l.mcLiquidaR), num(l.mcLiquidaPct), txt(l.vigencia||''), txt('')]
+      .join(';')
   ).join('\n');
   const corpoCombos = linhasCombo.map(l =>
-    [l.tipo==='promocao'?'Promoção':'Combo', l.nome, l.itensTxt||'', '', num(l.preco), '', '', '', '', l.vigencia||'', l.vigenciaFim||'', l.statusLabel]
-      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
+    [txt(l.tipo==='promocao'?'Promoção':'Combo'), txt(l.nome), txt(l.itensTxt||''), txt(l.statusLabel), txt(''), num(l.preco), txt(''), txt(''), txt(''), txt(''), txt(l.vigencia||''), txt(l.vigenciaFim||'')]
+      .join(';')
   ).join('\n');
   const corpo = [corpoProdutos, corpoCombos].filter(Boolean).join('\n');
   const blob = new Blob(['\uFEFF'+header+corpo], { type:'text/csv;charset=utf-8;' });
@@ -2337,6 +2378,108 @@ async function marcarAlertaLido(id){
   renderConfigMargem();
   atualizarBadgeAlertasMargem();
 }
+
+// ── FIDELIDADE (Pontos e Resgate) ─────────────────────────
+// Guia de conversão: preço de venda de cada produto → quantos pontos ele
+// custa pra resgate, usando a taxa (centavos por 1 ponto) definida pelo
+// marketing. Não grava nada por produto — é sempre calculado na hora a
+// partir do preço vigente, então nunca fica desatualizado.
+let fidelidadeEloAtual = 'loja_consumidor';
+
+function mudarFidelidadeElo(elo){
+  fidelidadeEloAtual = elo;
+  renderFidelidade();
+}
+
+function pontosParaResgate(precoVenda, centavosPorPonto){
+  const centavos = Math.round(Number(precoVenda||0) * 100);
+  return centavosPorPonto > 0 ? Math.round(centavos / centavosPorPonto) : 0;
+}
+
+async function renderFidelidade(){
+  const el = $('mainContent');
+  const subnav = '<div class="subnav">'+PRECOS_ELO_TABS.map(t =>
+    '<div class="subnav-item'+(t.elo===fidelidadeEloAtual?' active':'')+'" onclick="mudarFidelidadeElo(\''+t.elo+'\')">'+t.label+'</div>'
+  ).join('')+'</div>';
+  el.innerHTML = '<div class="card"><div class="loading">Carregando…</div></div>';
+
+  const [{ data: config, error: errCfg }, prodR, precoR] = await Promise.all([
+    sb.from('fidelidade_config').select('*').eq('id', 1).single(),
+    sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
+    sb.from('precificacao_precos').select('*').eq('status','aprovado'),
+  ]);
+  if(errCfg || prodR.error || precoR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
+
+  const centavosPorPonto = Number(config?.centavos_por_ponto) || 5;
+
+  const configCard = `<div class="card">
+    <h2>Conversão de Pontos</h2>
+    <p class="hint">Define quantos centavos valem 1 ponto do programa de fidelidade. O guia abaixo (quantos pontos cada produto custa pra resgate) é calculado automaticamente a partir desse valor — não precisa atualizar produto por produto.</p>
+    <div class="row" style="align-items:flex-end;gap:12px">
+      <div class="field"><label>Quantos centavos vale 1 ponto?</label>
+        <input type="number" step="1" min="1" class="inp" id="cfgCentavosPorPonto" value="${centavosPorPonto}" style="width:140px" ${souMarketing?'':'disabled'}>
+      </div>
+      ${souMarketing ? '<button class="btn" onclick="salvarCentavosPorPonto()">Salvar</button>' : '<span class="hint" style="margin:0">Só o marketing ou o master pode alterar este valor.</span>'}
+    </div>
+    <p class="hint" style="margin-top:6px">Ex: 5 = 1 ponto vale R$ 0,05. Um produto de R$ 10,00 custaria então 200 pontos pra resgate.</p>
+    <div id="fidelidadeMsg" class="msg"></div>
+    ${config?.atualizado_por_nome ? '<p class="hint" style="margin-top:10px">Última atualização por '+esc(config.atualizado_por_nome)+' em '+fmtDataHora(config.atualizado_em)+'.</p>' : ''}
+  </div>`;
+
+  const produtos = (prodR.data||[]).filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(fidelidadeEloAtual));
+  const todosPrecos = precoR.data || [];
+  const linhas = produtos.map(p => {
+    const row = precoVigenteDe(todosPrecos, p.id, fidelidadeEloAtual);
+    if(!row) return null;
+    const preco = Number(row.preco_venda);
+    return { categoria: p.categoria, nome: p.nome, preco, pontos: pontosParaResgate(preco, centavosPorPonto) };
+  }).filter(Boolean);
+  window.__fidelidadeLinhasCache = linhas;
+
+  if(!linhas.length){
+    el.innerHTML = configCard + subnav + '<div class="card"><div class="empty">Nenhum produto com preço aprovado vigente pra esse elo ainda.</div></div>';
+    return;
+  }
+
+  const porCategoria = {};
+  linhas.forEach(l => { (porCategoria[l.categoria] = porCategoria[l.categoria] || []).push(l); });
+  const categorias = Object.keys(porCategoria).sort();
+
+  el.innerHTML = configCard + subnav +
+    '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><h2 style="margin:0">Guia de Conversão — '+ELO_LABEL[fidelidadeEloAtual]+'</h2><button class="btn-outline btn btn-sm" onclick="exportarFidelidadeCSV()">⬇ Exportar CSV/Excel</button></div><p class="hint">Quantos pontos cada produto custa pra resgate, no preço de venda vigente hoje.</p></div>' +
+    categorias.map(cat => {
+      const itens = porCategoria[cat].sort((a,b) => a.nome.localeCompare(b.nome));
+      return '<div class="card"><h2>'+esc(cat)+'</h2><div style="overflow-x:auto"><table><thead><tr><th>Produto</th><th>Preço de Venda</th><th>Pontos para Resgate</th></tr></thead><tbody>'+
+        itens.map(l => '<tr><td>'+esc(l.nome)+'</td><td>'+fmtMoeda(l.preco)+'</td><td><strong>'+l.pontos.toLocaleString('pt-BR')+'</strong></td></tr>').join('')+
+      '</tbody></table></div></div>';
+    }).join('');
+}
+
+async function salvarCentavosPorPonto(){
+  const centavos = Number($('cfgCentavosPorPonto').value);
+  if(isNaN(centavos) || centavos <= 0){ showMsg('fidelidadeMsg','Informe um valor válido, maior que zero.','err'); return; }
+  const { error } = await sb.from('fidelidade_config').update({
+    centavos_por_ponto: centavos, atualizado_por: meuPerfil.id, atualizado_por_nome: meuPerfil.nome, atualizado_em: new Date().toISOString()
+  }).eq('id', 1);
+  if(error){ showMsg('fidelidadeMsg','Erro ao salvar: '+error.message,'err'); return; }
+  showMsg('fidelidadeMsg','Conversão salva — o guia abaixo já está atualizado.','ok');
+  renderFidelidade();
+}
+
+function exportarFidelidadeCSV(){
+  const linhas = window.__fidelidadeLinhasCache || [];
+  if(!linhas.length) return;
+  const txt = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const num = v => v!=null ? v.toFixed(2).replace('.',',') : '';
+  const header = 'Categoria;Produto;Preco de Venda;Pontos para Resgate\n';
+  const corpo = linhas.map(l => [txt(l.categoria), txt(l.nome), num(l.preco), l.pontos].join(';')).join('\n');
+  const blob = new Blob(['\uFEFF'+header+corpo], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pontos-fidelidade-'+fidelidadeEloAtual+'-'+hojeISO()+'.csv';
+  a.click();
+}
+
 
 // ── VARIAÇÃO DE CUSTOS (últimos 30 dias) ──────────────────
 // Mostra, por produto, como o custo andou nos últimos 30 dias — inclui edição
@@ -2431,11 +2574,11 @@ function toggleHistoricoCusto(i){
 
 function exportarVariacaoCustosCSV(){
   if(!variacaoCustosCache.length) return;
-  const num = v => v.toFixed(4).replace('.',',');
+  const txt = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const num = v => v!=null ? v.toFixed(4).replace('.',',') : '';
   const header = 'Categoria;Produto;Custo ha 30 dias;Custo atual;Variacao (R$);Variacao (%)\n';
   const corpo = variacaoCustosCache.map(l =>
-    [l.categoria, l.nome, num(l.custoInicial), num(l.custoAtual), num(l.diffR), num(l.diffPct)]
-      .map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')
+    [txt(l.categoria), txt(l.nome), num(l.custoInicial), num(l.custoAtual), num(l.diffR), num(l.diffPct)].join(';')
   ).join('\n');
   const blob = new Blob(['\uFEFF'+header+corpo], { type:'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
