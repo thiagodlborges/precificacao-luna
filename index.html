@@ -1175,6 +1175,14 @@ let precoEditandoId = null;
 let produtoSelecionadoPrecos = null;
 let precosCache = [];
 let precosEloAtual = 'loja_consumidor';
+// Filtro da aba Preços: true = só ativos (padrão), false = todos. Lembrado no navegador.
+let precosSoAtivos = true;
+try { precosSoAtivos = localStorage.getItem('precos_so_ativos') !== '0'; } catch(e) {}
+function mudarFiltroAtivosPrecos(soAtivos){
+  precosSoAtivos = !!soAtivos;
+  try { localStorage.setItem('precos_so_ativos', precosSoAtivos ? '1' : '0'); } catch(e) {}
+  renderPrecos();
+}
 
 const PRECOS_ELO_TABS = [
   { elo: 'loja_consumidor', label: '🛍️ Loja → Consumidor' },
@@ -1200,6 +1208,10 @@ async function renderPrecos(){
   const subnav = '<div class="subnav">'+PRECOS_ELO_TABS.map(t =>
     '<div class="subnav-item'+(t.elo===precosEloAtual?' active':'')+'" onclick="mudarPrecosElo(\''+t.elo+'\')">'+t.label+'</div>'
   ).join('')+'</div>';
+  const filtroAtivos = (qtdInativos) => '<div class="subnav" style="margin-top:-8px">'+
+    '<div class="subnav-item'+(precosSoAtivos?' active':'')+'" onclick="mudarFiltroAtivosPrecos(true)">✅ Só ativos</div>'+
+    '<div class="subnav-item'+(!precosSoAtivos?' active':'')+'" onclick="mudarFiltroAtivosPrecos(false)">📋 Todos'+(qtdInativos?' (+'+qtdInativos+' inativos)':'')+'</div>'+
+  '</div>';
 
   try {
     const [prodR, precoR, tribLinksR] = await Promise.all([
@@ -1224,15 +1236,18 @@ async function renderPrecos(){
     window.__todosPrecosCache = todosPrecos;
     window.__somaTributosPorPrecoCache = somaTributosPorPreco;
 
-    const produtosFiltrados = produtos.filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(precosEloAtual));
+    const produtosDoElo = produtos.filter(p => (ELOS_POR_ORIGEM[p.origem]||[]).includes(precosEloAtual));
+    const qtdInativos = produtosDoElo.filter(p => !p.ativo).length;
+    const produtosFiltrados = precosSoAtivos ? produtosDoElo.filter(p => p.ativo) : produtosDoElo;
+    const topo = subnav + filtroAtivos(qtdInativos);
 
-    if(!produtosFiltrados.length){ el.innerHTML = subnav+'<div class="card"><div class="empty">Nenhum produto cadastrado com esse elo ainda.</div></div>'; return; }
+    if(!produtosFiltrados.length){ el.innerHTML = topo+'<div class="card"><div class="empty">'+(produtosDoElo.length ? 'Nenhum produto ativo nesse elo — clique em "Todos" pra ver os inativos.' : 'Nenhum produto cadastrado com esse elo ainda.')+'</div></div>'; return; }
 
     const porCategoria = {};
     produtosFiltrados.forEach(p => { (porCategoria[p.categoria] = porCategoria[p.categoria] || []).push(p); });
     const categorias = Object.keys(porCategoria).sort();
 
-    el.innerHTML = subnav + categorias.map(cat => {
+    el.innerHTML = topo + categorias.map(cat => {
       const linhas = porCategoria[cat].map(p => {
         const row = precoVigenteDe(todosPrecos, p.id, precosEloAtual);
         const tributosPreco = row ? (somaTributosPorPreco[row.id] || []) : [];
