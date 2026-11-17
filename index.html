@@ -2418,12 +2418,15 @@ async function renderFidelidade(){
   ).join('')+'</div>';
   el.innerHTML = '<div class="card"><div class="loading">Carregando…</div></div>';
 
-  const [{ data: config, error: errCfg }, prodR, precoR] = await Promise.all([
+  const [{ data: config, error: errCfg }, prodR, precoR, comboR, comboItR, comboPrR] = await Promise.all([
     sb.from('fidelidade_config').select('*').eq('id', 1).single(),
     sb.from('precificacao_produtos').select('*').eq('ativo', true).order('categoria').order('nome'),
     sb.from('precificacao_precos').select('*').eq('status','aprovado'),
+    sb.from('precificacao_combos').select('*').eq('ativo', true).order('nome'),
+    sb.from('precificacao_combo_itens').select('combo_id, elo'),
+    sb.from('precificacao_combo_precos').select('*').eq('status','aprovado'),
   ]);
-  if(errCfg || prodR.error || precoR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
+  if(errCfg || prodR.error || precoR.error || comboR.error || comboItR.error || comboPrR.error){ el.innerHTML = '<div class="card"><div class="empty">Erro ao carregar.</div></div>'; return; }
 
   const centavosPorPonto = Number(config?.centavos_por_ponto) || 5;
 
@@ -2449,6 +2452,18 @@ async function renderFidelidade(){
     const preco = Number(row.preco_venda);
     return { categoria: p.categoria, nome: p.nome, preco, pontos: pontosParaResgate(preco, centavosPorPonto) };
   }).filter(Boolean);
+
+  // Combos e promoções: entram no elo se algum item do combo for desse elo; usa o preço vigente aprovado
+  const hojeF = hojeISO();
+  (comboR.data||[]).forEach(c => {
+    if(!(comboItR.data||[]).some(i => i.combo_id === c.id && i.elo === fidelidadeEloAtual)) return;
+    const pv = (comboPrR.data||[])
+      .filter(r => r.combo_id === c.id && r.vigencia_inicio <= hojeF && (!r.vigencia_fim || r.vigencia_fim >= hojeF))
+      .sort((a,b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio))[0];
+    if(!pv) return;
+    const preco = Number(pv.preco_combo);
+    linhas.push({ categoria: c.tipo === 'promocao' ? '🏷️ Promoções' : '🎁 Combos', nome: c.nome, preco, pontos: pontosParaResgate(preco, centavosPorPonto) });
+  });
   window.__fidelidadeLinhasCache = linhas;
 
   if(!linhas.length){
